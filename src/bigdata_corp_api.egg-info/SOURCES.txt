@@ -1,0 +1,8 @@
+LICENSE
+MANIFEST.in
+README.md
+setup.py
+src/bigdata_corp_api.egg-info/PKG-INFO
+src/bigdata_corp_api.egg-info/SOURCES.txt
+src/bigdata_corp_api.egg-info/dependency_links.txt
+src/bigdata_corp_api.egg-info/top_level.txt

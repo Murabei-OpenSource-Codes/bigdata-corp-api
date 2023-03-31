@@ -2,7 +2,7 @@
 import os
 import unittest
 from bigdatacorp_api.data import BigDataCorpAPI
-from bigdatacorp_api.bigdata_api import (
+from bigdatacorp_api.exceptions import (
     BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
     BigDataCorpAPIMaxRetryException)
 

@@ -50,6 +50,66 @@ class BigDataCorpAPI:
         "related_people_phones",
         "vehicles"]
 
+    CNPJ_DATABASES = [
+        "syndicate_agreements",
+        "investment_fund_data",
+        'electoral_donors',
+        'owners_electoral_donors',
+        'company_evolution',
+        'activity_indicators',
+        'interests_and_behaviors',
+        'licenses_and_authorizations',
+        "financial_market",
+        'electoral_providers',
+        'industrial_property',
+        'employees_industrial_property',
+        'owners_industrial_property',
+        'domains',
+        'domains_extended',
+        'emails_extended',
+        'related_people_emails',
+        'addresses_extended',
+        'related_people_addresses',
+        'phones_extended',
+        'related_people_phones',
+        'basic_data',
+        'history_basic_data',
+        'media_profile_and_exposure',
+        'kyc_dtec_flex_news',
+        'kyc',
+        'economic_group_kyc',
+        'employees_kyc',
+        'owners_kyc',
+        'online_ads',
+        'marketplace_data',
+        'apps_networks_and_platforms',
+        'collections',
+        'owners_lawsuits',
+        'processes',
+        'reputations_and_reviews',
+        "social_conscience",
+        "awards_and_certifications",
+        'circles_employees',
+        'circles_legal_representatives',
+        'circles_first_level_owners',
+        'economic_group_full_extended',
+        'economic_group_first_level_extended',
+        'economic_group_second_level_extended',
+        'economic_group_third_level_extended',
+        'company_group_household_activity',
+        'company_group_rfcontact',
+        'company_group_household',
+        'company_group_tradename',
+        'company_group_tradename_city',
+        'company_group_building',
+        'company_group_documentroot',
+        'company_group_officialname',
+        'company_group_legal_representative',
+        'company_group_owners',
+        'company_group_household_owners_surname',
+        'relationships',
+        'economic_group_relationships']
+
     def __init__(self, bigdata_auth_token: str):
         """
         __init__.
@@ -61,7 +121,7 @@ class BigDataCorpAPI:
 
     def list_cpf_dataset(self) -> list:
         """
-        Return avaiable BigData Datasets.
+        Return avaiable BigData CPF Datasets.
 
         Args:
             No Args
@@ -71,6 +131,19 @@ class BigDataCorpAPI:
             Return a list with avaiable datasets.
         """
         return self.CPF_DATABASES
+
+    def list_cnpj_dataset(self) -> list:
+        """
+        Return avaiable BigData CNPJ Datasets.
+
+        Args:
+            No Args
+        Kwargs:
+            No Kwargs
+        Return:
+            Return a list with avaiable datasets.
+        """
+        return self.CNPJ_DATABASES
 
     def get_cpf_dataset(self, cpf: str, dataset: str) -> dict:
         """
@@ -148,6 +221,79 @@ class BigDataCorpAPI:
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
+    def get_cnpj_dataset(self, cnpj: str, dataset: str) -> dict:
+        """
+        Call BigData API to fecth a database for a CNPJ.
+
+        Retry for 5 times sleeping 1 second when errors are raised.
+
+        Args:
+            cnpj [str]: Company CNPJ.
+            dataset [str]: Dataset on BigData that user should be fetched.
+        Return [dict]:
+            Information avaiable on BigData.
+        Raise:
+            BigDataCorpAPIException: Raise if errors in API occour.
+        """
+        if dataset not in self.CNPJ_DATABASES:
+            msg = (
+                "dataset [{dataset}] not avaiable on bigboost for CNPJ, "
+                "avaiable datasets:\n{datasets}").format(
+                dataset=dataset, datasets=", ".join(self.CNPJ_DATABASES))
+            raise BigDataCorpAPIException(msg)
+
+        url = "https://bigboost.bigdatacorp.com.br/companies"
+        payload = {
+            "Datasets": dataset,
+            "q": "doc{" + cnpj + "}",
+            "Limit": 1}
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "AccessToken": self._bigdata_auth_token}
+
+        error_msgs = []
+        for i in range(5):
+            try:
+                response = requests.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                response_json = response.json()
+                status_data = response_json['Status']
+
+                # Check if the CNPJ has a match
+                status = status_data[dataset][0]
+                if status['Code'] == 0:
+                    return response.json()
+
+                elif status['Code'] == -1200:
+                    raise BigDataCorpAPIInvalidDatabaseException(
+                        message="database is invalid",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+                else:
+                    raise BigDataCorpAPIInvalidDocumentException(
+                        message="cnpj is invalid",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+
+            # Raise if document is invalid
+            except BigDataCorpAPIException as e:
+                raise e
+
+            except Exception as e:
+                error_msgs.append(str(e))
+                print("!!Error fetching BigData API:", str(e))
+
+        msg = (
+            "Untreated error on API with max 5 retries:{}\n".format(
+                "\n".join(error_msgs)))
+        raise BigDataCorpAPIMaxRetryException(
+            message=msg, payload={"errors": error_msgs})
+
     def get_cpf_datasets(self, cpf: str, datasets: list,
                          verbosity: bool = False) -> dict:
         """
@@ -170,4 +316,29 @@ class BigDataCorpAPI:
                 print("Fetching dataset:", db)
             response_dict[db] = self.get_cpf_dataset(
                 cpf=cpf, dataset=db)
+        return response_dict
+
+    def get_cnpj_datasets(self, cnpj: str, datasets: list,
+                         verbosity: bool = False) -> dict:
+        """
+        Fetch a list of datasets and return a dictionary with all info.
+
+        Args:
+            cnpj [str]: Company cnpj.
+            datasets [list[str]]: List of all datasets to be fetched.
+        Kwargs:
+            verbosity [bool]: If set true will print a msg for each dataset
+                fetch.
+        Returns [dict]:
+            Return a dictionary with all dataset information, with keys
+            corresponding to dataset name.
+        """
+
+        cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
+        response_dict = {}
+        for db in datasets:
+            if verbosity:
+                print("Fetching dataset:", db)
+            response_dict[db] = self.get_cnpj_dataset(
+                cnpj=cnpj, dataset=db)
         return response_dict

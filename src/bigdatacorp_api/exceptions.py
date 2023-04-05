@@ -26,6 +26,8 @@ class BigDataCorpAPIException(Exception):
 class BigDataCorpAPIInvalidDocumentException(BigDataCorpAPIException):
     pass
 
+class BigDataCorpAPIInvalidDatabaseException(BigDataCorpAPIException):
+    pass
 
 class BigDataCorpAPIMinorDocumentException(BigDataCorpAPIException):
     pass

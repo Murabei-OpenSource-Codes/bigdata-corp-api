@@ -8,6 +8,7 @@ import requests
 from bigdatacorp_api.exceptions import (
     BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
     BigDataCorpAPIMinorDocumentException,
+    BigDataCorpAPIInvalidDatabaseException,
     BigDataCorpAPIMaxRetryException)
 
 

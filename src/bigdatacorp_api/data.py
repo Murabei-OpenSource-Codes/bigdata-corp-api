@@ -12,7 +12,6 @@ from bigdatacorp_api.exceptions import (
     BigDataCorpAPIMaxRetryException)
 
 
-
 class BigDataCorpAPI:
     CPF_DATABASES = [
         "election_candidate_data",
@@ -320,7 +319,7 @@ class BigDataCorpAPI:
         return response_dict
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list,
-                         verbosity: bool = False) -> dict:
+                          verbosity: bool = False) -> dict:
         """
         Fetch a list of datasets and return a dictionary with all info.
 
@@ -343,3 +342,46 @@ class BigDataCorpAPI:
             response_dict[db] = self.get_cnpj_dataset(
                 cnpj=cnpj, dataset=db)
         return response_dict
+
+    def get_used_data(self, initial_date, final_date):
+        results = {
+            "people": [],
+            "company": []
+        }
+        url = "https://plataforma.bigdatacorp.com.br/usage"
+
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "AccessToken": self._bigdata_auth_token,
+        }
+
+        payload = {
+            "InitialReferenceDate": initial_date.strftime("%Y-%m-%d"),
+            "FinalReferenceDate": final_date.strftime("%Y-%m-%d"),
+            "DateFormat": "yyyy-MM-dd"
+        }
+
+        for api in self.CPF_DATABASES:
+            payload["Api"] = "people"
+            payload["Datasets"] = api
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                results["people"].append({
+                    api: response.text
+                })
+            except Exception as err:
+                print(f"{err}")
+
+        for api in self.CNPJ_DATABASES:
+            payload["Api"] = "companies"
+            payload["Datasets"] = api
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                results["company"].append({
+                    api: response.text
+                })
+            except Exception as err:
+                print(f"{err}")
+
+        return results

@@ -12,7 +12,6 @@ from bigdatacorp_api.exceptions import (
     BigDataCorpAPIMaxRetryException)
 
 
-
 class BigDataCorpAPI:
     CPF_DATABASES = [
         "election_candidate_data",
@@ -320,7 +319,7 @@ class BigDataCorpAPI:
         return response_dict
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list,
-                         verbosity: bool = False) -> dict:
+                          verbosity: bool = False) -> dict:
         """
         Fetch a list of datasets and return a dictionary with all info.
 
@@ -343,3 +342,75 @@ class BigDataCorpAPI:
             response_dict[db] = self.get_cnpj_dataset(
                 cnpj=cnpj, dataset=db)
         return response_dict
+
+    def get_usage(self, initial_date: str, final_date: str):
+        """
+        Retrieves usage data for a specified date range.
+
+        Parameters:
+        - initial_date (str): The initial date of the range in the format 'yyyy-MM-dd'.
+        - final_date (str): The final date of the range in the format 'yyyy-MM-dd'.
+
+        Returns:
+        - results (list): A list of dictionaries containing the usage data for each API and endpoint.
+          Each dictionary has the following keys:
+            - 'api_type' (str): The type of API ('people' or 'companies').
+            - 'end_point' (str): The endpoint of the API.
+            - 'successful_requests' (int): The total number of successful requests made.
+            - 'requests_with_error' (int): The total number of requests with errors.
+            - 'queries_charged' (int): The total number of queries charged.
+            - 'queries_not_charged' (int): The total number of queries not charged.
+            - 'estimated_price' (float): The total estimated price for the usage.
+
+        """
+        results = []
+        url = "https://plataforma.bigdatacorp.com.br/usage"
+
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "AccessToken": self._bigdata_auth_token,
+        }
+
+        payload = {
+            "InitialReferenceDate": initial_date,
+            "FinalReferenceDate": final_date,
+            "DateFormat": "yyyy-MM-dd"
+        }
+
+        for api in self.CPF_DATABASES:
+            payload["Api"] = "people"
+            payload["Datasets"] = api
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                results.append({
+                    'api_type': "people",
+                    'end_point': api,
+                    "successful_requests": response.json()["UsageData"]["TotalSuccessfulRequests"],
+                    "requests_with_error": response.json()["UsageData"]["TotalRequestsWithError"],
+                    "queries_charged": response.json()["UsageData"]["TotalQueriesCharged"],
+                    "queries_not_charged": response.json()["UsageData"]["TotalQueriesNotCharged"],
+                    "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
+                })
+
+            except Exception as err:
+                print(f"{err}")
+
+        for api in self.CNPJ_DATABASES:
+            payload["Api"] = "companies"
+            payload["Datasets"] = api
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                results.append({
+                    'api_type': "companies",
+                    'end_point': api,
+                    "successful_requests": response.json()["UsageData"]["TotalSuccessfulRequests"],
+                    "requests_with_error": response.json()["UsageData"]["TotalRequestsWithError"],
+                    "queries_charged": response.json()["UsageData"]["TotalQueriesCharged"],
+                    "queries_not_charged": response.json()["UsageData"]["TotalQueriesNotCharged"],
+                    "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
+                })
+            except Exception as err:
+                print(f"{err}")
+
+        return results

@@ -343,7 +343,26 @@ class BigDataCorpAPI:
                 cnpj=cnpj, dataset=db)
         return response_dict
 
-    def get_used(self, initial_date: str, final_date: str):
+    def get_usage(self, initial_date: str, final_date: str):
+        """
+        Retrieves usage data for a specified date range.
+
+        Parameters:
+        - initial_date (str): The initial date of the range in the format 'yyyy-MM-dd'.
+        - final_date (str): The final date of the range in the format 'yyyy-MM-dd'.
+
+        Returns:
+        - results (list): A list of dictionaries containing the usage data for each API and endpoint.
+          Each dictionary has the following keys:
+            - 'api_type' (str): The type of API ('people' or 'companies').
+            - 'end_point' (str): The endpoint of the API.
+            - 'successful_requests' (int): The total number of successful requests made.
+            - 'requests_with_error' (int): The total number of requests with errors.
+            - 'queries_charged' (int): The total number of queries charged.
+            - 'queries_not_charged' (int): The total number of queries not charged.
+            - 'estimated_price' (float): The total estimated price for the usage.
+
+        """
         results = []
         url = "https://plataforma.bigdatacorp.com.br/usage"
 

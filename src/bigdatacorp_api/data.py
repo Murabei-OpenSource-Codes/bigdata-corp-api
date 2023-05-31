@@ -343,11 +343,8 @@ class BigDataCorpAPI:
                 cnpj=cnpj, dataset=db)
         return response_dict
 
-    def get_used_data(self, initial_date, final_date):
-        results = {
-            "people": [],
-            "company": []
-        }
+    def get_used(self, initial_date: str, final_date: str):
+        results = []
         url = "https://plataforma.bigdatacorp.com.br/usage"
 
         headers = {
@@ -357,8 +354,8 @@ class BigDataCorpAPI:
         }
 
         payload = {
-            "InitialReferenceDate": initial_date.strftime("%Y-%m-%d"),
-            "FinalReferenceDate": final_date.strftime("%Y-%m-%d"),
+            "InitialReferenceDate": initial_date,
+            "FinalReferenceDate": final_date,
             "DateFormat": "yyyy-MM-dd"
         }
 
@@ -367,9 +364,16 @@ class BigDataCorpAPI:
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
-                results["people"].append({
-                    api: response.text
+                results.append({
+                    'api_type': "people",
+                    'end_point': api,
+                    "successful_requests": response.json()["UsageData"]["TotalSuccessfulRequests"],
+                    "requests_with_error": response.json()["UsageData"]["TotalRequestsWithError"],
+                    "queries_charged": response.json()["UsageData"]["TotalQueriesCharged"],
+                    "queries_not_charged": response.json()["UsageData"]["TotalQueriesNotCharged"],
+                    "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
                 })
+
             except Exception as err:
                 print(f"{err}")
 
@@ -378,8 +382,14 @@ class BigDataCorpAPI:
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
-                results["company"].append({
-                    api: response.text
+                results.append({
+                    'api_type': "companies",
+                    'end_point': api,
+                    "successful_requests": response.json()["UsageData"]["TotalSuccessfulRequests"],
+                    "requests_with_error": response.json()["UsageData"]["TotalRequestsWithError"],
+                    "queries_charged": response.json()["UsageData"]["TotalQueriesCharged"],
+                    "queries_not_charged": response.json()["UsageData"]["TotalQueriesNotCharged"],
+                    "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
                 })
             except Exception as err:
                 print(f"{err}")

@@ -420,8 +420,3 @@ class BigDataCorpAPI:
                 raise err
 
         return results
-
-
-if __name__ in "__main__":
-    inst = BigDataCorpAPI(bigdata_auth_token='eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1bmlxdWVfbmFtZSI6Ik1VUkFCRUlfQkFUIiwibmJmIjoxNjgwNzkyMjY0LCJleHAiOjE2ODU2MzA2NjQsImlhdCI6MTY4MDc5MjI2NCwiaXNzIjoiQmlnIERhdGEgQ29ycC4iLCJwcm9kdWN0cyI6WyJCSUdCT09TVCIsIkJJR0lEIl0sImRvbWFpbiI6Ik1VUkFCRUlfUkVWRU5EQSJ9.PBROCj3iYh-Pv8rjieShagMhlG3ilYnyjKiWWHhg0n8')
-    inst.get_usage('2023-05-01', '2023-05-15')

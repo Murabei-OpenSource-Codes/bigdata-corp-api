@@ -383,6 +383,10 @@ class BigDataCorpAPI:
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
+                print(response.json()['Status'])
+                if response.json()['Status']['Code'] != 200:
+                    raise BigDataCorpAPIException(response.json()['Status']['Message'])
+
                 results.append({
                     'api_type': "people",
                     'end_point': api,
@@ -394,13 +398,15 @@ class BigDataCorpAPI:
                 })
 
             except Exception as err:
-                print(f"{err}")
+                raise err
 
         for api in self.CNPJ_DATABASES:
             payload["Api"] = "companies"
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
+                if response.json()['Status']['Code'] != 200:
+                    raise BigDataCorpAPIException(response.json()['Status']['Message'])
                 results.append({
                     'api_type': "companies",
                     'end_point': api,
@@ -411,6 +417,11 @@ class BigDataCorpAPI:
                     "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
                 })
             except Exception as err:
-                print(f"{err}")
+                raise err
 
         return results
+
+
+if __name__ in "__main__":
+    inst = BigDataCorpAPI(bigdata_auth_token='eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1bmlxdWVfbmFtZSI6Ik1VUkFCRUlfQkFUIiwibmJmIjoxNjgwNzkyMjY0LCJleHAiOjE2ODU2MzA2NjQsImlhdCI6MTY4MDc5MjI2NCwiaXNzIjoiQmlnIERhdGEgQ29ycC4iLCJwcm9kdWN0cyI6WyJCSUdCT09TVCIsIkJJR0lEIl0sImRvbWFpbiI6Ik1VUkFCRUlfUkVWRU5EQSJ9.PBROCj3iYh-Pv8rjieShagMhlG3ilYnyjKiWWHhg0n8')
+    inst.get_usage('2023-05-01', '2023-05-15')

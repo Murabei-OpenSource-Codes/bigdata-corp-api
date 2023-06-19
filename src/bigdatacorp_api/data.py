@@ -383,7 +383,9 @@ class BigDataCorpAPI:
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
-                print(response.json()['Status'])
+                if response.status_code == 500:
+                    response.raise_for_status()
+
                 if response.json()['Status']['Code'] != 200:
                     raise BigDataCorpAPIException(response.json()['Status']['Message'])
 
@@ -405,8 +407,13 @@ class BigDataCorpAPI:
             payload["Datasets"] = api
             try:
                 response = requests.post(url, headers=headers, json=payload)
+
+                if response.status_code == 500:
+                    response.raise_for_status()
+
                 if response.json()['Status']['Code'] != 200:
                     raise BigDataCorpAPIException(response.json()['Status']['Message'])
+
                 results.append({
                     'api_type': "companies",
                     'end_point': api,
@@ -416,6 +423,7 @@ class BigDataCorpAPI:
                     "queries_not_charged": response.json()["UsageData"]["TotalQueriesNotCharged"],
                     "estimated_price": response.json()["UsageData"]["TotalEstimatedPrice"],
                 })
+
             except Exception as err:
                 raise err
 

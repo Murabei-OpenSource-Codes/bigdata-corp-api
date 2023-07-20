@@ -9,7 +9,13 @@ from bigdatacorp_api.exceptions import (
     BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
     BigDataCorpAPIMinorDocumentException,
     BigDataCorpAPIInvalidDatabaseException,
-    BigDataCorpAPIMaxRetryException)
+    BigDataCorpAPIMaxRetryException,
+    BigDataCorpAPIInvalidInputException,
+    BigDataCorpAPILoginProblemException,
+    BigDataCorpAPIProblemAPIException,
+    BigDataCorpAPIOnDemandQueriesException,
+    BigDataCorpAPIMonitoringAPIException,
+    BigDataCorpAPIUnmappedErrorException)
 
 
 class BigDataCorpAPI:
@@ -195,9 +201,46 @@ class BigDataCorpAPI:
                 status = status_data[dataset][0]
                 if status['Code'] == 0:
                     return response.json()
+                elif status['Code'] >= -202 and status['Code'] <= -100:
+                    raise BigDataCorpAPIInvalidInputException(
+                        message="error related to input data",
+                        payload={
+                            'bigdata_status': status,
+                            'cpf': cpf
+                        })
+                elif status['Code'] >= -1002 and status['Code'] <= -1000:
+                    raise BigDataCorpAPILoginProblemException(
+                        message="error related to login problem",
+                        payload={
+                            'bigdata_status': status,
+                            'cpf': cpf
+                        })
+                elif status['Code'] >= -2999 and status['Code'] <= -2000:
+                    raise BigDataCorpAPIProblemAPIException(
+                        message="error related to internal problems in APIs "
+                                "or services",
+                        payload={
+                            'bigdata_status': status,
+                            'cpf': cpf
+                        })
+                elif status['Code'] >= -1999 and status['Code'] <= -1200:
+                    raise BigDataCorpAPIOnDemandQueriesException(
+                        message="error related to on-demand queries",
+                        payload={
+                            'bigdata_status': status,
+                            'cpf': cpf
+                        })
+                elif status['Code'] <= -3000:
+                    raise BigDataCorpAPIMonitoringAPIException(
+                        message="error related to problems in the Monitoring "
+                                "API or Asynchronous Calls",
+                        payload={
+                            'bigdata_status': status,
+                            'cpf': cpf
+                        })
                 else:
-                    raise BigDataCorpAPIInvalidDocumentException(
-                        message="cpf is invalid",
+                    raise BigDataCorpAPIUnmappedErrorException(
+                        message="unmapped error",
                         payload={
                             'bigdata_status': status,
                             'cpf': cpf
@@ -264,17 +307,46 @@ class BigDataCorpAPI:
                 status = status_data[dataset][0]
                 if status['Code'] == 0:
                     return response.json()
-
-                elif status['Code'] == -1200:
-                    raise BigDataCorpAPIInvalidDatabaseException(
-                        message="database is invalid",
+                elif status['Code'] >= -202 and status['Code'] <= -100:
+                    raise BigDataCorpAPIInvalidInputException(
+                        message="error related to input data",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+                elif status['Code'] >= -1002 and status['Code'] <= -1000:
+                    raise BigDataCorpAPILoginProblemException(
+                        message="error related to login problem",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+                elif status['Code'] >= -2999 and status['Code'] <= -2000:
+                    raise BigDataCorpAPIProblemAPIException(
+                        message="error related to internal problems in APIs "
+                                "or services",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+                elif status['Code'] >= -1999 and status['Code'] <= -1200:
+                    raise BigDataCorpAPIOnDemandQueriesException(
+                        message="error related to on-demand queries",
+                        payload={
+                            'bigdata_status': status,
+                            'cnpj': cnpj
+                        })
+                elif status['Code'] <= -3000:
+                    raise BigDataCorpAPIMonitoringAPIException(
+                        message="error related to problems in the Monitoring "
+                                "API or Asynchronous Calls",
                         payload={
                             'bigdata_status': status,
                             'cnpj': cnpj
                         })
                 else:
-                    raise BigDataCorpAPIInvalidDocumentException(
-                        message="cnpj is invalid",
+                    raise BigDataCorpAPIUnmappedErrorException(
+                        message="unmapped error",
                         payload={
                             'bigdata_status': status,
                             'cnpj': cnpj
@@ -309,7 +381,6 @@ class BigDataCorpAPI:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
-
         response_dict = {}
         for db in datasets:
             if verbosity:
@@ -333,7 +404,6 @@ class BigDataCorpAPI:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
-
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
         for db in datasets:

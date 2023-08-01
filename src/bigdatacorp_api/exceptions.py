@@ -35,3 +35,21 @@ class BigDataCorpAPIMinorDocumentException(BigDataCorpAPIException):
 
 class BigDataCorpAPIMaxRetryException(BigDataCorpAPIException):
     pass
+
+class BigDataCorpAPILoginProblemException(BigDataCorpAPIException):
+    pass
+
+class BigDataCorpAPIProblemAPIException(BigDataCorpAPIException):
+    pass
+
+class BigDataCorpAPIOnDemandQueriesException(BigDataCorpAPIException):
+    pass
+
+class BigDataCorpAPIMonitoringAPIException(BigDataCorpAPIException):
+    pass
+
+class BigDataCorpAPIUnmappedErrorException(BigDataCorpAPIException):
+    pass
+
+class BigDataCorpAPIInvalidInputException(BigDataCorpAPIException):
+    pass

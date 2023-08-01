@@ -1,12 +1,11 @@
 Metadata-Version: 2.1
 Name: bigdata-corp-api
-Version: 0.4
+Version: 0.5
 Summary: Python API to facilitate interaction with BigDataCorp end-points
 Home-page: https://github.com/Murabei-OpenSource-Codes/bigdata-corp-api
 Author: Murabei Data Science
 Author-email: a.baceti@murabei.com
 License: BSD-3-Clause License
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
@@ -15,5 +14,3 @@ License-File: LICENSE
 
 # bigdata-corp-api
 Python API to facilitate interaction with BigDataCorp end-points
-
-

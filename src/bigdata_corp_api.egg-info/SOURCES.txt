@@ -6,3 +6,6 @@ src/bigdata_corp_api.egg-info/PKG-INFO
 src/bigdata_corp_api.egg-info/SOURCES.txt
 src/bigdata_corp_api.egg-info/dependency_links.txt
 src/bigdata_corp_api.egg-info/top_level.txt
+src/bigdatacorp_api/__init__.py
+src/bigdatacorp_api/data.py
+src/bigdatacorp_api/exceptions.py

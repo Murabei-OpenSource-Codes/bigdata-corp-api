@@ -463,8 +463,9 @@ class BigDataCorpAPI:
                 if response.status_code == 500:
                     response.raise_for_status()
 
-                if response.json()['Status']['Code'] != 200:
-                    raise BigDataCorpAPIException(response.json()['Status']['Message'])
+                if response.status_code != 200:
+                    raise BigDataCorpAPIException(
+                        response.json()['Status']['Message'])
 
                 results.append({
                     'api_type': "people",
@@ -482,7 +483,7 @@ class BigDataCorpAPI:
                 })
 
             except Exception as err:
-                raise err
+                print(err)
 
         for api in self.CNPJ_DATABASES:
             payload["Api"] = "companies"
@@ -493,8 +494,9 @@ class BigDataCorpAPI:
                 if response.status_code == 500:
                     response.raise_for_status()
 
-                if response.json()['Status']['Code'] != 200:
-                    raise BigDataCorpAPIException(response.json()['Status']['Message'])
+                if response.status_code != 200:
+                    raise BigDataCorpAPIException(
+                        response.json()['Status']['Message'])
 
                 results.append({
                     'api_type': "companies",
@@ -512,6 +514,6 @@ class BigDataCorpAPI:
                 })
 
             except Exception as err:
-                raise err
+                print(err)
 
         return results

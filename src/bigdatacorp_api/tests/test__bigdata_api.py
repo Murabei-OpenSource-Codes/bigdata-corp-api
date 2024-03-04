@@ -16,13 +16,13 @@ class TestBigDataCorpAPI(unittest.TestCase):
 
     def test__ok(self):
         bigdata_api = BigDataCorpAPI(
-            bigdata_auth_token=CONFIG["BIGDATA_AUTH_TOKEN"])
+            bigdata_auth_token=BIGDATA_AUTH_TOKEN)
         bigdata_api.get_cpf_dataset(
             cpf=TEST_CPF, dataset="basic_data")
 
     def test__invalid(self):
         bigdata_api = BigDataCorpAPI(
-            bigdata_auth_token=CONFIG["BIGDATA_AUTH_TOKEN"])
+            bigdata_auth_token=BIGDATA_AUTH_TOKEN)
         with self.assertRaises(
                 BigDataCorpAPIInvalidDocumentException) as context:
             bigdata_api.get_cpf_dataset(

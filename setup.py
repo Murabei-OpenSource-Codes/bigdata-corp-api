@@ -24,7 +24,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setuptools.setup(
     name='bigdata-corp-api',
-    version='0.8',
+    version='0.10',
     include_package_data=True,
     license='BSD-3-Clause License',
     description=(

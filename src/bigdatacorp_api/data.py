@@ -197,17 +197,25 @@ class BigDataCorpAPI:
                         message="this cpf belongs to a minor",
                         payload=birth_validation[0])
 
+                login_entry = status_data.get("login")
+                if login_entry is not None:
+                    login_return = login_entry[0]
+                    if login_return["Code"] == -101:
+                        msg = "BigBoost user has expired"
+                        raise BigDataCorpAPILoginProblemException(msg)
+
                 # Check if the CPF has a match
                 status = status_data[dataset][0]
                 if status['Code'] == 0:
                     return response.json()
+
                 elif status['Code'] >= -202 and status['Code'] <= -100:
                     raise BigDataCorpAPIInvalidInputException(
                         message="error related to input data",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
-                        })
+                            'cpf': cpf})
+
                 elif status['Code'] >= -1002 and status['Code'] <= -1000:
                     raise BigDataCorpAPILoginProblemException(
                         message="error related to login problem",
@@ -248,6 +256,10 @@ class BigDataCorpAPI:
 
             # Raise if document is invalid
             except BigDataCorpAPIException as e:
+                raise e
+
+            # Raise if document is invalid
+            except BigDataCorpAPILoginProblemException as e:
                 raise e
 
             # Raise if document is from an under age (age < 18)
@@ -302,6 +314,13 @@ class BigDataCorpAPI:
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
+
+                login_entry = status_data.get("login")
+                if login_entry is not None:
+                    login_return = login_entry[0]
+                    if login_return["Code"] == -101:
+                        msg = "BigBoost user has expired"
+                        raise BigDataCorpAPILoginProblemException(msg)
 
                 # Check if the CNPJ has a match
                 status = status_data[dataset][0]

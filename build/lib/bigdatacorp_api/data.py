@@ -20,6 +20,7 @@ from bigdatacorp_api.exceptions import (
 
 class BigDataCorpAPI:
     CPF_DATABASES = [
+        "government_debtors",
         "election_candidate_data",
         "circles_college_class",
         "circles_coworkers",
@@ -57,6 +58,7 @@ class BigDataCorpAPI:
         "vehicles"]
 
     CNPJ_DATABASES = [
+        "government_debtors",
         "syndicate_agreements",
         "investment_fund_data",
         'electoral_donors',

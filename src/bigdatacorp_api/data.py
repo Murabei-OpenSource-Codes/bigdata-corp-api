@@ -58,6 +58,7 @@ class BigDataCorpAPI:
         "vehicles"]
 
     CNPJ_DATABASES = [
+        "partner_murabei_credit_score_company",
         "government_debtors",
         "syndicate_agreements",
         "investment_fund_data",

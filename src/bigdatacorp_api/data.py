@@ -119,6 +119,10 @@ class BigDataCorpAPI:
         'relationships',
         'economic_group_relationships']
 
+    MARKETPLACE_DATABASES = [
+        "partner_murabei_credit_score_company"
+    ]
+
     def __init__(self, bigdata_auth_token: str):
         """
         __init__.
@@ -300,7 +304,11 @@ class BigDataCorpAPI:
                 dataset=dataset, datasets=", ".join(self.CNPJ_DATABASES))
             raise BigDataCorpAPIException(msg)
 
-        url = "https://bigboost.bigdatacorp.com.br/companies"
+        if dataset in self.MARKETPLACE_DATABASES:
+            url = "https://plataforma.bigdatacorp.com.br/marketplace"
+        else:
+            url = "https://bigboost.bigdatacorp.com.br/companies"
+
         payload = {
             "Datasets": dataset,
             "q": "doc{" + cnpj + "}",

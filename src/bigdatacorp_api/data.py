@@ -123,6 +123,11 @@ class BigDataCorpAPI:
         "partner_murabei_credit_score_company"
     ]
 
+    PROCESS_DATABASES = [
+        'basic_data',
+        'cade_processes_data'
+    ]
+
     def __init__(self, bigdata_auth_token: str):
         """
         __init__.
@@ -157,6 +162,19 @@ class BigDataCorpAPI:
             Return a list with avaiable datasets.
         """
         return self.CNPJ_DATABASES
+
+    def list_process_dataset(self) -> list:
+        """
+        Return avaiable BigData process Datasets.
+
+        Args:
+            No Args
+        Kwargs:
+            No Kwargs
+        Return:
+            Return a list with avaiable datasets.
+        """
+        return self.PROCESS_DATABASES
 
     def get_cpf_dataset(self, cpf: str, dataset: str) -> dict:
         """
@@ -396,6 +414,116 @@ class BigDataCorpAPI:
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
+
+    def get_process_dataset(self, process: str, dataset: str) -> dict:
+        """Call BigData API to fecth a database for a process.
+
+        Retry for 5 times sleeping 1 second when errors are raised.
+
+        Args:
+            process [str]: process number.
+            dataset [str]: Dataset on BigData that user should be fetched.
+        Return [dict]:
+            Information avaiable on BigData.
+        Raise:
+            BigDataCorpAPIException: Raise if errors in API occour.
+        """
+        if dataset not in self.PROCESS_DATABASES:
+            msg = (
+                "dataset [{dataset}] not avaiable on bigboost for process, "
+                "avaiable datasets:\n{datasets}").format(
+                dataset=dataset, datasets=", ".join(self.PROCESS_DATABASES))
+            raise BigDataCorpAPIException(msg)
+
+        url = "https://plataforma.bigdatacorp.com.br/processos"
+
+        payload = {
+            "Datasets": dataset,
+            "q": "processnumber{" + process + "}",
+            "Limit": 1}
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "AccessToken": self._bigdata_auth_token}
+
+        error_msgs = []
+        for i in range(5):
+            try:
+                response = requests.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                response_json = response.json()
+                status_data = response_json['Status']
+
+                login_entry = status_data.get("login")
+                if login_entry is not None:
+                    login_return = login_entry[0]
+                    if login_return["Code"] == -101:
+                        msg = "BigBoost user has expired"
+                        raise BigDataCorpAPILoginProblemException(msg)
+
+                # Check if the process has a match
+                status = status_data[dataset][0]
+                if status['Code'] == 0:
+                    return response.json()
+                elif status['Code'] >= -202 and status['Code'] <= -100:
+                    raise BigDataCorpAPIInvalidInputException(
+                        message="error related to input data",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+                elif status['Code'] >= -1002 and status['Code'] <= -1000:
+                    raise BigDataCorpAPILoginProblemException(
+                        message="error related to login problem",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+                elif status['Code'] >= -2999 and status['Code'] <= -2000:
+                    raise BigDataCorpAPIProblemAPIException(
+                        message="error related to internal problems in APIs "
+                                "or services",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+                elif status['Code'] >= -1999 and status['Code'] <= -1200:
+                    raise BigDataCorpAPIOnDemandQueriesException(
+                        message="error related to on-demand queries",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+                elif status['Code'] <= -3000:
+                    raise BigDataCorpAPIMonitoringAPIException(
+                        message="error related to problems in the Monitoring "
+                                "API or Asynchronous Calls",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+                else:
+                    raise BigDataCorpAPIUnmappedErrorException(
+                        message="unmapped error",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process
+                        })
+
+            # Raise if document is invalid
+            except BigDataCorpAPIException as e:
+                raise e
+
+            except Exception as e:
+                error_msgs.append(str(e))
+                print("!!Error fetching BigData API:", str(e))
+
+        msg = (
+            "Untreated error on API with max 5 retries:{}\n".format(
+                "\n".join(error_msgs)))
+        raise BigDataCorpAPIMaxRetryException(
+            message=msg, payload={"errors": error_msgs})
+
     def get_cpf_datasets(self, cpf: str, datasets: list,
                          verbosity: bool = False) -> dict:
         """
@@ -442,6 +570,31 @@ class BigDataCorpAPI:
             response_dict[db] = self.get_cnpj_dataset(
                 cnpj=cnpj, dataset=db)
         return response_dict
+
+
+    def get_process_datasets(self, process: str, datasets: list,
+                             verbosity: bool = False) -> dict:
+        """Fetch a list of datasets and return a dictionary with all info.
+
+        Args:
+            process [str]: process number.
+            datasets [list[str]]: List of all datasets to be fetched.
+        Kwargs:
+            verbosity [bool]: If set true will print a msg for each dataset
+                fetch.
+        Returns [dict]:
+            Return a dictionary with all dataset information, with keys
+            corresponding to dataset name.
+        """
+        process = process.replace(".", "").replace("/", "").replace("-", "")
+        response_dict = {}
+        for db in datasets:
+            if verbosity:
+                print("Fetching dataset:", db)
+            response_dict[db] = self.get_process_dataset(
+                process=process, dataset=db)
+        return response_dict
+
 
     def get_usage(self, initial_date: str, final_date: str):
         """

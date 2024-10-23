@@ -55,7 +55,8 @@ class BigDataCorpAPI:
         "related_people",
         "phones_extended",
         "related_people_phones",
-        "vehicles"]
+        "vehicles",
+        "registration_data"]
 
     CNPJ_DATABASES = [
         "partner_murabei_credit_score_company",
@@ -117,7 +118,8 @@ class BigDataCorpAPI:
         'company_group_owners',
         'company_group_household_owners_surname',
         'relationships',
-        'economic_group_relationships']
+        'economic_group_relationships',
+        "registration_data"]
 
     MARKETPLACE_DATABASES = [
         "partner_murabei_credit_score_company"

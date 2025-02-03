@@ -15,7 +15,8 @@ from bigdatacorp_api.exceptions import (
     BigDataCorpAPIProblemAPIException,
     BigDataCorpAPIOnDemandQueriesException,
     BigDataCorpAPIMonitoringAPIException,
-    BigDataCorpAPIUnmappedErrorException)
+    BigDataCorpAPIUnmappedErrorException,
+    BigDataCorpAPIEmptyEnrichedProcessException)
 
 
 class BigDataCorpAPI:
@@ -241,14 +242,16 @@ class BigDataCorpAPI:
                         message="error related to input data",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf})
+                            'cpf': cpf,
+                            'dataset': dataset})
 
                 elif status['Code'] >= -1002 and status['Code'] <= -1000:
                     raise BigDataCorpAPILoginProblemException(
                         message="error related to login problem",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
+                            'cpf': cpf,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -2999 and status['Code'] <= -2000:
                     raise BigDataCorpAPIProblemAPIException(
@@ -256,14 +259,16 @@ class BigDataCorpAPI:
                                 "or services",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
+                            'cpf': cpf,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -1999 and status['Code'] <= -1200:
                     raise BigDataCorpAPIOnDemandQueriesException(
                         message="error related to on-demand queries",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
+                            'cpf': cpf,
+                            'dataset': dataset
                         })
                 elif status['Code'] <= -3000:
                     raise BigDataCorpAPIMonitoringAPIException(
@@ -271,14 +276,16 @@ class BigDataCorpAPI:
                                 "API or Asynchronous Calls",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
+                            'cpf': cpf,
+                            'dataset': dataset
                         })
                 else:
                     raise BigDataCorpAPIUnmappedErrorException(
                         message="unmapped error",
                         payload={
                             'bigdata_status': status,
-                            'cpf': cpf
+                            'cpf': cpf,
+                            'dataset': dataset
                         })
 
             # Raise if document is invalid
@@ -362,14 +369,16 @@ class BigDataCorpAPI:
                         message="error related to input data",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -1002 and status['Code'] <= -1000:
                     raise BigDataCorpAPILoginProblemException(
                         message="error related to login problem",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -2999 and status['Code'] <= -2000:
                     raise BigDataCorpAPIProblemAPIException(
@@ -377,14 +386,16 @@ class BigDataCorpAPI:
                                 "or services",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -1999 and status['Code'] <= -1200:
                     raise BigDataCorpAPIOnDemandQueriesException(
                         message="error related to on-demand queries",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
                 elif status['Code'] <= -3000:
                     raise BigDataCorpAPIMonitoringAPIException(
@@ -392,14 +403,16 @@ class BigDataCorpAPI:
                                 "API or Asynchronous Calls",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
                 else:
                     raise BigDataCorpAPIUnmappedErrorException(
                         message="unmapped error",
                         payload={
                             'bigdata_status': status,
-                            'cnpj': cnpj
+                            'cnpj': cnpj,
+                            'dataset': dataset
                         })
 
             # Raise if document is invalid
@@ -455,6 +468,9 @@ class BigDataCorpAPI:
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
+                result_data = response_json.\
+                    get('Result', [{}])[0].\
+                    get('BasicData', {})
 
                 login_entry = status_data.get("login")
                 if login_entry is not None:
@@ -465,21 +481,31 @@ class BigDataCorpAPI:
 
                 # Check if the process has a match
                 status = status_data[dataset][0]
-                if status['Code'] == 0:
+                if status['Code'] == 0 and result_data:
                     return response.json()
+                elif not result_data:
+                    raise BigDataCorpAPIEmptyEnrichedProcessException(
+                        message="no process data returned",
+                        payload={
+                            'bigdata_status': status,
+                            'process_number': process,
+                            'dataset': dataset
+                        })
                 elif status['Code'] >= -202 and status['Code'] <= -100:
                     raise BigDataCorpAPIInvalidInputException(
                         message="error related to input data",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -1002 and status['Code'] <= -1000:
                     raise BigDataCorpAPILoginProblemException(
                         message="error related to login problem",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -2999 and status['Code'] <= -2000:
                     raise BigDataCorpAPIProblemAPIException(
@@ -487,14 +513,16 @@ class BigDataCorpAPI:
                                 "or services",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
                 elif status['Code'] >= -1999 and status['Code'] <= -1200:
                     raise BigDataCorpAPIOnDemandQueriesException(
                         message="error related to on-demand queries",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
                 elif status['Code'] <= -3000:
                     raise BigDataCorpAPIMonitoringAPIException(
@@ -502,14 +530,16 @@ class BigDataCorpAPI:
                                 "API or Asynchronous Calls",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
                 else:
                     raise BigDataCorpAPIUnmappedErrorException(
                         message="unmapped error",
                         payload={
                             'bigdata_status': status,
-                            'process_number': process
+                            'process_number': process,
+                            'dataset': dataset
                         })
 
             # Raise if document is invalid

@@ -61,3 +61,6 @@ class BigDataCorpAPIUnmappedErrorException(BigDataCorpAPIException):
 
 class BigDataCorpAPIInvalidInputException(BigDataCorpAPIException):
     pass
+
+class BigDataCorpAPIEmptyEnrichedProcessException(BigDataCorpAPIException):
+    pass

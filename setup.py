@@ -1,30 +1,43 @@
 """setup."""
 import os
-import setuptools
-try:  # for pip >= 10
-    from pip._internal.req import parse_requirements
-except ImportError:  # for pip <= 9.0.3
-    from pip.req import parse_requirements
+import re
+from setuptools import setup, find_packages
 
 
-with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
-    README = readme.read()
+def parse_requirements(filename):
+    """Load requirements from a requirements.txt file."""
+    with open(filename) as f:
+        lines = f.read().splitlines()
 
-requirements_path = os.path.join(
-    os.path.dirname(__file__), 'requirements.txt')
-install_reqs = parse_requirements(requirements_path, session=False)
-try:
-    requirements = [str(ir.req) for ir in install_reqs]
-except Exception:
-    requirements = [str(ir.requirement) for ir in install_reqs]
+    requirements = []
+    for line in lines:
+        # Skip comments and empty lines
+        if line.startswith('#') or not line.strip():
+            continue
 
+        # Remove whitespace and any trailing comments
+        line = re.sub(r'\s*#.*$', '', line).strip()
+        if line:  # Add if not empty after cleanup
+            requirements.append(line)
+
+    return requirements
+
+
+# Read README
+with open(os.path.join(os.path.dirname(__file__), 'README.md'),
+          encoding='utf-8') as f:
+    README = f.read()
+
+# Parse requirements.txt
+requirements_path = os.path.join(os.path.dirname(__file__), 'requirements.txt')
+requirements = parse_requirements(requirements_path)
 
 # allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
-setuptools.setup(
+setup(
     name='bigdata-corp-api',
-    version='0.16',
+    version='0.16.1',
     include_package_data=True,
     license='BSD-3-Clause License',
     description=(
@@ -40,6 +53,6 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     install_requires=requirements,
-    packages=setuptools.find_packages(where="src"),
+    packages=find_packages(where="src"),
     python_requires=">=3.6",
 )

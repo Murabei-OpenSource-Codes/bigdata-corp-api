@@ -1,0 +1,35 @@
+[tool.ruff]
+line-length = 79 # Quantidade de caracteres que o linter irá considerar na linha
+indent-width = 4
+
+# Pastas onde o linter não atuara. Por padrão ele só lê arquivos python e ignora tudo dentro do .gitignore
+exclude = [
+]
+
+# Lista de linters que serão aplicados. o ruff da suporte a vários e eles podem ser adicionados aqui.
+[tool.ruff.lint]
+select = [
+    "F", # Pyflakes - Procura bugs básicos no codigo
+    "E", # pycodestyle - Pep8
+    "W", # pycodestyle - Pep8
+    "D", # pydocstyle - Docstring
+    # "I", # Isort - Imports
+    "PD", # pandas-vet - linter de pandas (não deixa usar inplace nem df como nome de variavel)
+    "N", # pep8-naming - nomes seguindo pep8
+    "S", # flake8-bandit - linter de vulnerabilidade (nmao deixa usar assert)
+]
+
+# Os códigos de erros colocados aqui são ignorados pelo linter. O erro abaixo é em relação ao assert. Está comentado por padrão.
+ignore = [
+  # "S101" # Use of `assert` detected
+  "E402", "N806"
+]
+
+# ativa um modo plus do ruff
+preview = true
+
+[tool.ruff.format]
+indent-style = "space"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google" # seleciona as docstrings do google como padrão

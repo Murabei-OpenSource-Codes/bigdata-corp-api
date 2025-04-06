@@ -1,14 +1,8 @@
 """BigDataCorp Python API."""
-import os
-import time
-import json
-import time
-import datetime
 import requests
+from typing import List
 from bigdatacorp_api.exceptions import (
-    BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
-    BigDataCorpAPIMinorDocumentException,
-    BigDataCorpAPIInvalidDatabaseException,
+    BigDataCorpAPIException, BigDataCorpAPIMinorDocumentException,
     BigDataCorpAPIMaxRetryException,
     BigDataCorpAPIInvalidInputException,
     BigDataCorpAPILoginProblemException,
@@ -20,6 +14,8 @@ from bigdatacorp_api.exceptions import (
 
 
 class BigDataCorpAPI:
+    """Class to help interact with BigDataCorp API."""
+
     CPF_DATABASES = [
         "government_debtors",
         "election_candidate_data",
@@ -132,66 +128,64 @@ class BigDataCorpAPI:
     ]
 
     def __init__(self, bigdata_auth_token: str):
-        """
-        __init__.
+        """__init__.
 
         Args:
-            bigdata_auth_token [str]: Authentication token for BigData API.
+            bigdata_auth_token (str):
+                Authentication token for BigData API.
         """
         self._bigdata_auth_token = bigdata_auth_token
 
     def list_cpf_dataset(self) -> list:
-        """
-        Return avaiable BigData CPF Datasets.
+        """Return avaiable BigData CPF Datasets.
 
         Args:
             No Args
-        Kwargs:
-            No Kwargs
-        Return:
+
+        Returns:
             Return a list with avaiable datasets.
         """
         return self.CPF_DATABASES
 
     def list_cnpj_dataset(self) -> list:
-        """
-        Return avaiable BigData CNPJ Datasets.
+        """Return avaiable BigData CNPJ Datasets.
 
         Args:
             No Args
-        Kwargs:
-            No Kwargs
-        Return:
+
+        Returns:
             Return a list with avaiable datasets.
         """
         return self.CNPJ_DATABASES
 
     def list_process_dataset(self) -> list:
-        """
-        Return avaiable BigData process Datasets.
+        """Return avaiable BigData process Datasets.
 
         Args:
             No Args
-        Kwargs:
-            No Kwargs
-        Return:
+
+        Returns:
             Return a list with avaiable datasets.
         """
         return self.PROCESS_DATABASES
 
     def get_cpf_dataset(self, cpf: str, dataset: str) -> dict:
-        """
-        Call BigData API to fecth a database for a CPF.
+        """Call BigData API to fecth a database for a CPF.
 
         Retry for 5 times sleeping 1 second when errors are raised.
 
         Args:
-            cpf [str]: Person's CPF.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
+            cpf (str):
+                Person's CPF.
+            dataset (str):
+                Dataset on BigData that user should be fetched.
+
+        Returns:
             Information avaiable on BigData.
-        Raise:
-            BigDataCorpAPIException: Raise if errors in API occour.
+
+        Raises:
+            BigDataCorpAPIException:
+                Raise if errors in API occour.
         """
         if dataset not in self.CPF_DATABASES:
             msg = (
@@ -213,7 +207,8 @@ class BigDataCorpAPI:
         error_msgs = []
         for i in range(5):
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(
+                    url, json=payload, headers=headers, timeout=60)
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
@@ -311,18 +306,22 @@ class BigDataCorpAPI:
             message=msg, payload={"errors": error_msgs})
 
     def get_cnpj_dataset(self, cnpj: str, dataset: str) -> dict:
-        """
-        Call BigData API to fecth a database for a CNPJ.
+        """Call BigData API to fecth a database for a CNPJ.
 
         Retry for 5 times sleeping 1 second when errors are raised.
 
         Args:
-            cnpj [str]: Company CNPJ.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
+            cnpj (str):
+                Company CNPJ.
+            dataset (str):
+                Dataset on BigData that user should be fetched.
+
+        Returns:
             Information avaiable on BigData.
-        Raise:
-            BigDataCorpAPIException: Raise if errors in API occour.
+
+        Raises:
+            BigDataCorpAPIException:
+                Raise if errors in API occour.
         """
         if dataset not in self.CNPJ_DATABASES:
             msg = (
@@ -348,7 +347,8 @@ class BigDataCorpAPI:
         error_msgs = []
         for i in range(5):
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(
+                    url, json=payload, headers=headers, timeout=60)
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
@@ -429,18 +429,21 @@ class BigDataCorpAPI:
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
-
     def get_process_dataset(self, process: str, dataset: str) -> dict:
         """Call BigData API to fecth a database for a process.
 
         Retry for 5 times sleeping 1 second when errors are raised.
 
         Args:
-            process [str]: process number.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
+            process (str):
+                Process number.
+            dataset (str):
+                Dataset on BigData that user should be fetched.
+
+        Returns:
             Information avaiable on BigData.
-        Raise:
+
+        Raises:
             BigDataCorpAPIException: Raise if errors in API occour.
         """
         if dataset not in self.PROCESS_DATABASES:
@@ -464,7 +467,8 @@ class BigDataCorpAPI:
         error_msgs = []
         for i in range(5):
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(
+                    url, json=payload, headers=headers, timeout=60)
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
@@ -556,18 +560,19 @@ class BigDataCorpAPI:
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
-    def get_cpf_datasets(self, cpf: str, datasets: list,
+    def get_cpf_datasets(self, cpf: str, datasets: List[str],
                          verbosity: bool = False) -> dict:
-        """
-        Fetch a list of datasets and return a dictionary with all info.
+        """Fetch a list of datasets and return a dictionary with all info.
 
         Args:
-            cpf [str]: Person's CPF.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
+            cpf (str):
+                Person's CPF.
+            datasets (List[str]):
+                List of all datasets to be fetched.
+            verbosity (bool):
+                If set true will print a msg for each dataset fetch.
+
+        Returns:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
@@ -579,18 +584,19 @@ class BigDataCorpAPI:
                 cpf=cpf, dataset=db)
         return response_dict
 
-    def get_cnpj_datasets(self, cnpj: str, datasets: list,
+    def get_cnpj_datasets(self, cnpj: str, datasets: List[str],
                           verbosity: bool = False) -> dict:
-        """
-        Fetch a list of datasets and return a dictionary with all info.
+        """Fetch a list of datasets and return a dictionary with all info.
 
         Args:
-            cnpj [str]: Company cnpj.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
+            cnpj (str):
+                Company cnpj.
+            datasets (List[str]):
+                List of all datasets to be fetched.
+            verbosity (bool):
+                If set true will print a msg for each dataset fetch.
+
+        Returns:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
@@ -603,18 +609,19 @@ class BigDataCorpAPI:
                 cnpj=cnpj, dataset=db)
         return response_dict
 
-
     def get_process_datasets(self, process: str, datasets: list,
                              verbosity: bool = False) -> dict:
         """Fetch a list of datasets and return a dictionary with all info.
 
         Args:
-            process [str]: process number.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
+            process (str):
+                Process number.
+            datasets (List[str]):
+                List of all datasets to be fetched.
+            verbosity (bool):
+                If set true will print a msg for each dataset fetch.
+
+        Returns:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
@@ -627,21 +634,22 @@ class BigDataCorpAPI:
                 process=process, dataset=db)
         return response_dict
 
+    def get_usage(self, initial_date: str, final_date: str) -> List[dict]:
+        """Retrieves usage data for a specified date range.
 
-    def get_usage(self, initial_date: str, final_date: str):
-        """
-        Retrieves usage data for a specified date range.
-
-        Parameters:
-        - initial_date (str): The initial date of the range in the format
-            'yyyy-MM-dd'.
-        - final_date (str): The final date of the range in the format
-            'yyyy-MM-dd'.
+        Args:
+            initial_date (str):
+                The initial date of the range in the format
+                'yyyy-MM-dd'.
+            final_date (str):
+                The final date of the range in the format
+                'yyyy-MM-dd'.
 
         Returns:
-        - results (list): A list of dictionaries containing the usage data for
-            each API and endpoint.
-          Each dictionary has the following keys:
+            results (list): A list of dictionaries containing the usage data
+            for each API and endpoint.
+
+            Each dictionary has the following keys:
             - 'api_type' (str): The type of API ('people' or 'companies').
             - 'end_point' (str): The endpoint of the API.
             - 'successful_requests' (int): The total number of successful
@@ -653,7 +661,6 @@ class BigDataCorpAPI:
                 not charged.
             - 'estimated_price' (float): The total estimated price
                 for the usage.
-
         """
         results = []
         url = "https://plataforma.bigdatacorp.com.br/usage"
@@ -674,7 +681,8 @@ class BigDataCorpAPI:
             payload["Api"] = "people"
             payload["Datasets"] = api
             try:
-                response = requests.post(url, headers=headers, json=payload)
+                response = requests.post(
+                    url, headers=headers, json=payload, timeout=60)
                 if response.status_code == 500:
                     response.raise_for_status()
 
@@ -704,28 +712,29 @@ class BigDataCorpAPI:
             payload["Api"] = "companies"
             payload["Datasets"] = api
             try:
-                response = requests.post(url, headers=headers, json=payload)
+                response = requests.post(
+                    url, headers=headers, json=payload, timeout=60)
+                response_json = response.json()
 
                 if response.status_code == 500:
                     response.raise_for_status()
-
                 if response.status_code != 200:
-                    raise BigDataCorpAPIException(
-                        response.json()['Status']['Message'])
+                    msg = response_json['Status']['Message']
+                    raise BigDataCorpAPIException(message=msg)
 
                 results.append({
                     'api_type': "companies",
                     'end_point': api,
-                    "successful_requests": response.json()["UsageData"]
-                                            ["TotalSuccessfulRequests"],
-                    "requests_with_error": response.json()["UsageData"]
-                                            ["TotalRequestsWithError"],
-                    "queries_charged": response.json()["UsageData"]
-                                            ["TotalQueriesCharged"],
-                    "queries_not_charged": response.json()["UsageData"]
-                                            ["TotalQueriesNotCharged"],
-                    "estimated_price": response.json()["UsageData"]
-                                        ["TotalEstimatedPrice"],
+                    "successful_requests": (
+                        response_json["UsageData"]["TotalSuccessfulRequests"]),
+                    "requests_with_error": (
+                        response_json["UsageData"]["TotalRequestsWithError"]),
+                    "queries_charged": (
+                        response_json["UsageData"]["TotalQueriesCharged"]),
+                    "queries_not_charged": (
+                        response_json["UsageData"]["TotalQueriesNotCharged"]),
+                    "estimated_price": (
+                        response_json["UsageData"]["TotalEstimatedPrice"]),
                 })
 
             except Exception as err:

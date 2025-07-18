@@ -571,12 +571,15 @@ class BigDataCorpAPI:
             Return a dictionary with all dataset information, with keys
             corresponding to dataset name.
         """
-        response_dict = {}
+        response_dict = {"errors": {}}
         for db in datasets:
             if verbosity:
                 print("Fetching dataset:", db)
-            response_dict[db] = self.get_cpf_dataset(
-                cpf=cpf, dataset=db)
+            try:
+                response_dict[db] = self.get_cpf_dataset(
+                    cpf=cpf, dataset=db)
+            except BigDataCorpAPIException as error:
+                response_dict["errors"][db] = error
         return response_dict
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list,
@@ -595,12 +598,15 @@ class BigDataCorpAPI:
             corresponding to dataset name.
         """
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
-        response_dict = {}
+        response_dict = {"errors": {}}
         for db in datasets:
             if verbosity:
                 print("Fetching dataset:", db)
-            response_dict[db] = self.get_cnpj_dataset(
-                cnpj=cnpj, dataset=db)
+            try:
+                response_dict[db] = self.get_cnpj_dataset(
+                    cnpj=cnpj, dataset=db)
+            except BigDataCorpAPIException as error:
+                response_dict["errors"][db] = error
         return response_dict
 
 
@@ -619,12 +625,15 @@ class BigDataCorpAPI:
             corresponding to dataset name.
         """
         process = process.replace(".", "").replace("/", "").replace("-", "")
-        response_dict = {}
+        response_dict = {"errors": {}}
         for db in datasets:
             if verbosity:
                 print("Fetching dataset:", db)
-            response_dict[db] = self.get_process_dataset(
-                process=process, dataset=db)
+            try:
+                response_dict[db] = self.get_process_dataset(
+                    process=process, dataset=db)
+            except BigDataCorpAPIException as error:
+                response_dict["errors"][db] = error
         return response_dict
 
 

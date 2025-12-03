@@ -120,7 +120,8 @@ class BigDataCorpAPI:
         'company_group_household_owners_surname',
         'relationships',
         'economic_group_relationships',
-        "registration_data"]
+        "registration_data",
+        "merchant_category_data"]
 
     MARKETPLACE_DATABASES = [
         "partner_murabei_credit_score_company"

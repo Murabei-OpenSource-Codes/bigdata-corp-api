@@ -1,8 +1,7 @@
 source VERSION
-sed -e 's#{VERSION}#'"${VERSION}"'#g' setup_template.py > setup.py
+sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
 
-rm -R build/
-python3 setup.py build sdist bdist_wheel
+poetry build
 
 git add --all
 git commit -m "Building a new version ${VERSION}"

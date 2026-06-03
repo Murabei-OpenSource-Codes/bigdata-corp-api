@@ -57,7 +57,9 @@ class BigDataCorpAPI:
         "phones_extended",
         "related_people_phones",
         "vehicles",
-        "registration_data"]
+        "registration_data",
+        "ondemand_pgfn_person",
+        "ondemand_cert_debt_absence_by_state_person"]
 
     CNPJ_DATABASES = [
         "partner_murabei_credit_score_company",
@@ -120,7 +122,9 @@ class BigDataCorpAPI:
         'company_group_household_owners_surname',
         'relationships',
         'economic_group_relationships',
-        "registration_data"]
+        "registration_data",
+        "ondemand_pgfn_company",
+        "ondemand_cert_debt_absence_by_state_company"]
 
     MARKETPLACE_DATABASES = [
         "partner_murabei_credit_score_company"
@@ -130,6 +134,12 @@ class BigDataCorpAPI:
         'basic_data',
         'cade_processes_data'
     ]
+
+    ONDEMAND_DATABASES = [
+        "ondemand_pgfn_person",
+        "ondemand_cert_debt_absence_by_state_person",
+        "ondemand_pgfn_company",
+        "ondemand_cert_debt_absence_by_state_company"]
 
     def __init__(self, bigdata_auth_token: str):
         """
@@ -179,7 +189,8 @@ class BigDataCorpAPI:
         """
         return self.PROCESS_DATABASES
 
-    def get_cpf_dataset(self, cpf: str, dataset: str) -> dict:
+    def get_cpf_dataset(self, cpf: str, dataset: str,
+                        query_params: str = "") -> dict:
         """
         Call BigData API to fecth a database for a CPF.
 
@@ -200,10 +211,14 @@ class BigDataCorpAPI:
                 dataset=dataset, datasets=", ".join(self.CPF_DATABASES))
             raise BigDataCorpAPIException(msg)
 
-        url = "https://bigboost.bigdatacorp.com.br/peoplev2"
+        if dataset in self.ONDEMAND_DATABASES:
+            url = "https://plataforma.bigdatacorp.com.br/ondemand"
+        else:
+            url = "https://bigboost.bigdatacorp.com.br/peoplev2"
+
         payload = {
             "Datasets": dataset,
-            "q": "doc{" + cpf + "}",
+            "q": "doc{" + cpf + "}" + query_params,
             "Limit": 1}
         headers = {
             "accept": "application/json",
@@ -310,7 +325,8 @@ class BigDataCorpAPI:
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
-    def get_cnpj_dataset(self, cnpj: str, dataset: str) -> dict:
+    def get_cnpj_dataset(self, cnpj: str, dataset: str,
+                         query_params: str = "") -> dict:
         """
         Call BigData API to fecth a database for a CNPJ.
 
@@ -333,12 +349,14 @@ class BigDataCorpAPI:
 
         if dataset in self.MARKETPLACE_DATABASES:
             url = "https://plataforma.bigdatacorp.com.br/marketplace"
+        elif dataset in self.ONDEMAND_DATABASES:
+            url = "https://plataforma.bigdatacorp.com.br/ondemand"
         else:
             url = "https://bigboost.bigdatacorp.com.br/companies"
 
         payload = {
             "Datasets": dataset,
-            "q": "doc{" + cnpj + "}",
+            "q": "doc{" + cnpj + "}" + query_params,
             "Limit": 1}
         headers = {
             "accept": "application/json",
@@ -557,7 +575,7 @@ class BigDataCorpAPI:
             message=msg, payload={"errors": error_msgs})
 
     def get_cpf_datasets(self, cpf: str, datasets: list,
-                         verbosity: bool = False) -> dict:
+                         verbosity: bool = False, query_params: str = "") -> dict:
         """
         Fetch a list of datasets and return a dictionary with all info.
 
@@ -576,11 +594,11 @@ class BigDataCorpAPI:
             if verbosity:
                 print("Fetching dataset:", db)
             response_dict[db] = self.get_cpf_dataset(
-                cpf=cpf, dataset=db)
+                cpf=cpf, dataset=db, query_params=query_params)
         return response_dict
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list,
-                          verbosity: bool = False) -> dict:
+                          verbosity: bool = False, query_params: str = "") -> dict:
         """
         Fetch a list of datasets and return a dictionary with all info.
 
@@ -600,7 +618,7 @@ class BigDataCorpAPI:
             if verbosity:
                 print("Fetching dataset:", db)
             response_dict[db] = self.get_cnpj_dataset(
-                cnpj=cnpj, dataset=db)
+                cnpj=cnpj, dataset=db, query_params=query_params)
         return response_dict
 
 
@@ -732,3 +750,55 @@ class BigDataCorpAPI:
                 print(err)
 
         return results
+
+    def get_result_file(self, dataset: str, json_data: dict):
+        """Download result file from a given URL."""
+        certificate_data = (json_data.get(dataset)
+                            .get('Result')[0]
+                            .get('OnlineCertificates')[0]
+                            .get('AdditionalOutputData'))
+
+        file_url = certificate_data.get("RawResultFile")
+        file_type = certificate_data.get("RawResultFileType", "").lower()
+        has_file = file_url is not None and file_url != ""
+
+        if not has_file:
+            raise BigDataCorpAPIException(
+                message="No file URL found for provided data.",
+                payload={"dataset": dataset,
+                         "json_data": json_data})
+
+        try:
+            response = requests.get(
+                file_url, headers={"accept": "*/*"}, timeout=30)
+            response.raise_for_status()
+
+        except requests.exceptions.RequestException as e:
+            raise BigDataCorpAPIException(message=str(e))
+
+        result = {'file_type': file_type,
+                  'file_content': response.content}
+
+        # # Determine file type
+        # ft = (file_type or "").lower()
+        # if not ft:
+        #     # Tries to get file type from header
+        #     ctype = response.headers.get('content-type', '').lower()
+        #     if 'json' in ctype:
+        #         ft = 'json'
+        #     elif 'html' in ctype:
+        #         ft = 'html'
+
+        # # Return bytes
+        # if ft == 'json':
+        #     try:
+        #         text = content.decode(response.encoding or 'utf-8')
+        #         json.loads(text)
+        #         return text.encode('utf-8')
+        #     except Exception as e:
+        #         raise BigDataCorpAPIException(
+        #             message=('Downloaded file is not valid JSON: {}'
+        #                      .format(str(e))))
+
+        # Return raw content
+        return result

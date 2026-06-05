@@ -1,6 +1,6 @@
 [project]
 name = "bigdatacorp_api"
-version = "0.17"
+version = "0.18"
 description = "Python API to facilitate interaction with BigDataCorp end-points"
 authors = [
     {name = "Murabei Data Science",email = "a.baceti@murabei.com"}

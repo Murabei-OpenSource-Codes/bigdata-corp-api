@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  publish:
+    name: Build and publish package
+    permissions:
+      pages: write
+      contents: write
+      id-token: write
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build and publish package
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install poetry
+          
+          export VERSION=$(grep -E '^VERSION=' VERSION | cut -d'=' -f2-)
+          sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
+
+          python -m poetry build
+
+          echo "VERSION=${VERSION}"
+          
+          # pdoc --docformat="google" src/bigdatacorp_api -o ./docs
+          
+          poetry publish --username __token__ --password "$PYPI_API_TOKEN"
+
+      # - name: Upload Pages artifact
+      #   uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     path: ./docs
+
+      # - name: Deploy to GitHub Pages
+      #   id: deployment
+      #   uses: actions/deploy-pages@v4

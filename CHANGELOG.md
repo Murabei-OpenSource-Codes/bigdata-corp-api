@@ -5,16 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.18.2] - 2026-08-04
+### Added
+
+- `.github/workflows/ci.yml` — build and PyPI publish on push to `main`
+- `CHANGELOG.md` — release history in Keep a Changelog format
+- `bigdatacorp_api.__init__.py` — package module docstring with usage
+  example
 
 ### Changed
-
+- `BigDataCorpAPI` — Google docstrings and return type annotations on
+  public methods
+- `bigdatacorp_api.exceptions` — class and method docstrings on all
+  exception types
+- `README.md` — objective section, Poetry install path, `get_result_file`
+  quick start, and CI notes
+- `build.sh` — patch bump from `VERSION`, beta suffix on non-main branches
+- `pyproject_template.toml` — canonical metadata rendered at build time
 - `pyproject.toml` — corrected distribution name to `bigdata-corp-api` and
   explicit `bigdatacorp_api` package layout under `src/`
 - `.gitignore` — ignore `build/` and `*.egg-info/` artifacts
 
 ### Removed
-
 - `requirements.txt` — dependency declared in `pyproject.toml`
 - Committed build artifacts under `build/` and `dist/`
 

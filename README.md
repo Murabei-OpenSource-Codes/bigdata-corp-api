@@ -22,9 +22,10 @@ call dataset list or fetch methods.
 
 ### Scope
 
-Owns HTTP communication, dataset constants, and exception types. Credential
-storage, orchestration, and downstream persistence live in consuming
-services.
+Owns HTTP communication, dataset constants, exception types, usage
+reporting, and certificate file downloads from on-demand responses.
+Credential storage, orchestration, and downstream persistence live in
+consuming services.
 
 ## Install
 
@@ -40,9 +41,12 @@ From a built wheel or sdist:
 pip install dist/bigdata_corp_api-*.whl
 ```
 
-From source (requires Poetry or `pip` with `poetry-core`):
+From source (requires Poetry):
 
 ```bash
+pip install poetry
+export VERSION=$(grep -E '^VERSION=' VERSION | cut -d'=' -f2-)
+sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
 poetry build
 pip install dist/bigdata_corp_api-*.whl
 ```
@@ -82,6 +86,20 @@ usage = api.get_usage(
 )
 ```
 
+Download a certificate file from an on-demand dataset response:
+
+```python
+cert_response = api.get_cpf_dataset(
+    cpf="12345678901",
+    dataset="ondemand_cert_debt_absence_by_state_person",
+)
+file_data = api.get_result_file(
+    dataset="ondemand_cert_debt_absence_by_state_person",
+    json_data=cert_response,
+)
+# file_data["file_type"] and file_data["file_content"]
+```
+
 ## Configuration
 
 | Variable | Required | Description |
@@ -94,7 +112,8 @@ environment variables during normal API calls.
 
 ## Development
 
-Build a release (bumps patch in `VERSION`, renders `pyproject.toml`, tags):
+Build a release (bumps patch in `VERSION`, renders `pyproject.toml`, tags,
+and pushes):
 
 ```bash
 ./build.sh
@@ -113,6 +132,9 @@ Lint with Ruff (configuration in `pyproject.toml`):
 ```bash
 ruff check src/
 ```
+
+CI on `main` builds from `VERSION` and `pyproject_template.toml`, then
+publishes to PyPI when `PYPI_API_TOKEN` is configured.
 
 ## License
 

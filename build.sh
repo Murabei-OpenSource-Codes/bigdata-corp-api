@@ -8,6 +8,7 @@ sed -i "s/^VERSION=.*/VERSION=$new_version/" "$VERSION_FILE"
 echo "Updated version to $new_version"
 
 source VERSION
+<<<<<<< HEAD
 
 # Detecta branch atual e adiciona -beta se não for main/master
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -18,6 +19,10 @@ fi
 sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
 
 rm -R build/
+=======
+sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
+
+>>>>>>> 0097329391e641b66b5e3a5c1643497a17f12829
 poetry build
 
 git add --all

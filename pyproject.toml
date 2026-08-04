@@ -1,6 +1,6 @@
 [project]
 name = "bigdata-corp-api"
-version = "0.16"
+version = "0.18.3-b.0"
 description = "Python API to facilitate interaction with BigDataCorp end-points"
 readme = "README.md"
 requires-python = ">=3.6"

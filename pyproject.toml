@@ -1,0 +1,71 @@
+[project]
+name = "bigdata-corp-api"
+version = "0.16"
+description = "Python API to facilitate interaction with BigDataCorp end-points"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "BSD-3-Clause License" }
+authors = [
+    {name = "Murabei Data Science", email = "a.baceti@murabei.com"}
+]
+urls = { Homepage = "https://github.com/Murabei-OpenSource-Codes/bigdata-corp-api" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "requests",
+]
+
+[tool.poetry]
+packages = [{include = "bigdatacorp_api", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 79 # Quantidade de caracteres que o linter irá considerar na linha
+indent-width = 4
+
+# Pastas onde o linter não atuara. Por padrão ele só lê arquivos python e ignora tudo dentro do .gitignore
+exclude = [
+  "secrets/",
+  "__init__.py",
+]
+
+# Lista de linters que serão aplicados. o ruff da suporte a vários e eles podem ser adicionados aqui.
+[tool.ruff.lint]
+select = [
+    "F", # Pyflakes - Procura bugs básicos no codigo
+    "E", # pycodestyle - Pep8
+    "W", # pycodestyle - Pep8
+    "D", # pydocstyle - Docstring
+    "I", # Isort - Imports
+    "PD", # pandas-vet - linter de pandas (não deixa usar inplace nem df como nome de variavel)
+    "N", # pep8-naming - nomes seguindo pep8
+    "S", # flake8-bandit - linter de vulnerabilidade (nmao deixa usar assert)
+]
+
+# Os códigos de erros colocados aqui são ignorados pelo linter. O erro abaixo é em relação ao assert. Está comentado por padrão.
+ignore = [
+  # "S101" # Use of `assert` detected
+  "E402", "N806", "I001"
+]
+
+# ativa um modo plus do ruff
+preview = true
+
+[tool.ruff.format]
+indent-style = "space"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google" # seleciona as docstrings do google como padrão
+
+[tool.ruff.lint.isort]
+no-sections = true
+
+[dependency-groups]
+docs = [
+    "mkdocs (>=1.6.1,<2.0.0)"
+]

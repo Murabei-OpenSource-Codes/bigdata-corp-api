@@ -36,18 +36,15 @@ jobs:
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install poetry
+          pip install poetry pdoc
           
           export VERSION=$(grep -E '^VERSION=' VERSION | cut -d'=' -f2-)
           sed -e 's#{VERSION}#'"${VERSION}"'#g' pyproject_template.toml > pyproject.toml
 
           python -m poetry build
-
           echo "VERSION=${VERSION}"
           
-          # pdoc --docformat="google" src/bigdatacorp_api -o ./docs
-          
+          pdoc --docformat="google" src/bigdatacorp_api -o ./docs
           poetry publish --username __token__ --password "$PYPI_API_TOKEN"
 
       # - name: Upload Pages artifact

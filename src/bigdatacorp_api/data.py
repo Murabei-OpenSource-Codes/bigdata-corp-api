@@ -1,25 +1,36 @@
-"""BigDataCorp Python API."""
-import os
-import time
-import json
-import time
-import datetime
+"""BigDataCorp REST API client.
+
+Exposes ``BigDataCorpAPI`` for fetching CPF, CNPJ, and process datasets,
+aggregating paginated responses, reporting usage, and downloading result
+files from on-demand certificate endpoints.
+"""
+from __future__ import annotations
+
 import requests
 from bigdatacorp_api.exceptions import (
-    BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
-    BigDataCorpAPIMinorDocumentException,
+    BigDataCorpAPIEmptyEnrichedProcessException,
+    BigDataCorpAPIException,
     BigDataCorpAPIInvalidDatabaseException,
-    BigDataCorpAPIMaxRetryException,
+    BigDataCorpAPIInvalidDocumentException,
     BigDataCorpAPIInvalidInputException,
     BigDataCorpAPILoginProblemException,
-    BigDataCorpAPIProblemAPIException,
-    BigDataCorpAPIOnDemandQueriesException,
+    BigDataCorpAPIMaxRetryException,
+    BigDataCorpAPIMinorDocumentException,
     BigDataCorpAPIMonitoringAPIException,
+    BigDataCorpAPIOnDemandQueriesException,
+    BigDataCorpAPIProblemAPIException,
     BigDataCorpAPIUnmappedErrorException,
-    BigDataCorpAPIEmptyEnrichedProcessException)
+)
 
 
 class BigDataCorpAPI:
+    """Client for BigDataCorp REST API endpoints.
+
+    Wraps authentication, dataset discovery, paginated fetches, usage
+    reporting, and certificate file downloads behind typed methods with
+    domain-specific exceptions.
+    """
+
     CPF_DATABASES = [
         "government_debtors",
         "election_candidate_data",
@@ -57,7 +68,9 @@ class BigDataCorpAPI:
         "phones_extended",
         "related_people_phones",
         "vehicles",
-        "registration_data"]
+        "registration_data",
+        "ondemand_pgfn_person",
+        "ondemand_cert_debt_absence_by_state_person"]
 
     CNPJ_DATABASES = [
         "partner_murabei_credit_score_company",
@@ -120,7 +133,9 @@ class BigDataCorpAPI:
         'company_group_household_owners_surname',
         'relationships',
         'economic_group_relationships',
-        "registration_data"]
+        "registration_data",
+        "ondemand_pgfn_company",
+        "ondemand_cert_debt_absence_by_state_company"]
 
     MARKETPLACE_DATABASES = [
         "partner_murabei_credit_score_company"
@@ -131,95 +146,63 @@ class BigDataCorpAPI:
         'cade_processes_data'
     ]
 
-    def __init__(self, bigdata_auth_token: str):
-        """
-        __init__.
+    ONDEMAND_DATABASES = [
+        "ondemand_pgfn_person",
+        "ondemand_cert_debt_absence_by_state_person",
+        "ondemand_pgfn_company",
+        "ondemand_cert_debt_absence_by_state_company"]
+
+    def __init__(self, bigdata_auth_token: str) -> None:
+        """Initialize the API client.
 
         Args:
-            bigdata_auth_token [str]: Authentication token for BigData API.
+            bigdata_auth_token (str):
+                BigDataCorp access token sent as the ``AccessToken`` header.
         """
         self._bigdata_auth_token = bigdata_auth_token
 
-    def list_cpf_dataset(self) -> list:
-        """
-        Return avaiable BigData CPF Datasets.
+    def _send_request(
+        self, url: str, payload: dict, headers: dict, dataset: str,
+        query_type: str, query_val: str) -> dict:
+        """Sends a request to BigData API with retry logic and error handling.
 
         Args:
-            No Args
-        Kwargs:
-            No Kwargs
-        Return:
-            Return a list with avaiable datasets.
+            url (str): Target API URL.
+            payload (dict): Request payload.
+            headers (dict): Request headers.
+            dataset (str): Requested dataset name.
+            query_type (str): Key for the query value in exception payloads.
+                Options: 'cpf', 'cnpj', 'process_number'.
+            query_val (str): The query identifier value.
+
+        Returns:
+            dict: The response JSON dictionary.
+
+        Raises:
+            BigDataCorpAPIMinorDocumentException: If the CPF is of a minor.
+            BigDataCorpAPILoginProblemException: If login fails or expires.
+            BigDataCorpAPIEmptyEnrichedProcessException: If process data is
+                empty.
+            BigDataCorpAPIInvalidInputException: If there's an input error.
+            BigDataCorpAPIProblemAPIException: If there is an internal API
+                problem.
+            BigDataCorpAPIOnDemandQueriesException: If on-demand query fails.
+            BigDataCorpAPIMonitoringAPIException: If monitoring API fails.
+            BigDataCorpAPIUnmappedErrorException: For any other API error.
+            BigDataCorpAPIMaxRetryException: If all retries fail.
         """
-        return self.CPF_DATABASES
-
-    def list_cnpj_dataset(self) -> list:
-        """
-        Return avaiable BigData CNPJ Datasets.
-
-        Args:
-            No Args
-        Kwargs:
-            No Kwargs
-        Return:
-            Return a list with avaiable datasets.
-        """
-        return self.CNPJ_DATABASES
-
-    def list_process_dataset(self) -> list:
-        """
-        Return avaiable BigData process Datasets.
-
-        Args:
-            No Args
-        Kwargs:
-            No Kwargs
-        Return:
-            Return a list with avaiable datasets.
-        """
-        return self.PROCESS_DATABASES
-
-    def get_cpf_dataset(self, cpf: str, dataset: str) -> dict:
-        """
-        Call BigData API to fecth a database for a CPF.
-
-        Retry for 5 times sleeping 1 second when errors are raised.
-
-        Args:
-            cpf [str]: Person's CPF.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
-            Information avaiable on BigData.
-        Raise:
-            BigDataCorpAPIException: Raise if errors in API occour.
-        """
-        if dataset not in self.CPF_DATABASES:
-            msg = (
-                "dataset [{dataset}] not avaiable on bigboost for CPF, "
-                "avaiable datasets:\n{datasets}").format(
-                dataset=dataset, datasets=", ".join(self.CPF_DATABASES))
-            raise BigDataCorpAPIException(msg)
-
-        url = "https://bigboost.bigdatacorp.com.br/peoplev2"
-        payload = {
-            "Datasets": dataset,
-            "q": "doc{" + cpf + "}",
-            "Limit": 1}
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "AccessToken": self._bigdata_auth_token}
-
         error_msgs = []
+
         for i in range(5):
             try:
                 response = requests.post(url, json=payload, headers=headers)
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
+                # Treat minor validation error (CPF only)
+                birth_validation = status_data.get(
+                    'date_of_birth_validation')
 
-                # Treat minor validation error
-                birth_validation = status_data.get('date_of_birth_validation')
                 if birth_validation is not None:
                     raise BigDataCorpAPIMinorDocumentException(
                         message="this cpf belongs to a minor",
@@ -232,97 +215,277 @@ class BigDataCorpAPI:
                         msg = "BigBoost user has expired"
                         raise BigDataCorpAPILoginProblemException(msg)
 
-                # Check if the CPF has a match
+                # For process dataset, verify if there is any data
                 status = status_data[dataset][0]
-                if status['Code'] == 0:
-                    return response.json()
+                if query_type == "process_number":
+                    result_data = (
+                        response_json.get('Result', [{}])[0]
+                        .get('BasicData', {})
+                    )
+                    if status['Code'] == 0 and result_data:
+                        return response_json
+                    elif not result_data:
+                        raise BigDataCorpAPIEmptyEnrichedProcessException(
+                            message="no process data returned",
+                            payload={
+                                'bigdata_status': status,
+                                'process_number': query_val,
+                                'dataset': dataset})
 
-                elif status['Code'] >= -202 and status['Code'] <= -100:
+                else:
+                    if status['Code'] == 0:
+                        return response_json
+
+                payload_err = {
+                    'bigdata_status': status,
+                    query_type: query_val,
+                    'dataset': dataset}
+
+                if -202 <= status['Code'] <= -100:
                     raise BigDataCorpAPIInvalidInputException(
                         message="error related to input data",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset})
+                        payload=payload_err)
 
-                elif status['Code'] >= -1002 and status['Code'] <= -1000:
+                elif -1002 <= status['Code'] <= -1000:
                     raise BigDataCorpAPILoginProblemException(
                         message="error related to login problem",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -2999 and status['Code'] <= -2000:
+                        payload=payload_err)
+
+                elif -2999 <= status['Code'] <= -2000:
                     raise BigDataCorpAPIProblemAPIException(
                         message="error related to internal problems in APIs "
                                 "or services",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -1999 and status['Code'] <= -1200:
+                        payload=payload_err)
+
+                elif -1999 <= status['Code'] <= -1200:
                     raise BigDataCorpAPIOnDemandQueriesException(
                         message="error related to on-demand queries",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset
-                        })
+                        payload=payload_err)
+
                 elif status['Code'] <= -3000:
                     raise BigDataCorpAPIMonitoringAPIException(
                         message="error related to problems in the Monitoring "
                                 "API or Asynchronous Calls",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset
-                        })
+                        payload=payload_err)
+
                 else:
                     raise BigDataCorpAPIUnmappedErrorException(
                         message="unmapped error",
-                        payload={
-                            'bigdata_status': status,
-                            'cpf': cpf,
-                            'dataset': dataset
-                        })
+                        payload=payload_err)
 
-            # Raise if document is invalid
             except BigDataCorpAPIException as e:
-                raise e
-
-            # Raise if document is invalid
-            except BigDataCorpAPILoginProblemException as e:
-                raise e
-
-            # Raise if document is from an under age (age < 18)
-            except BigDataCorpAPIMinorDocumentException as e:
                 raise e
 
             except Exception as e:
                 error_msgs.append(str(e))
                 print("!!Error fetching BigData API:", str(e))
 
-        msg = (
-            "Untreated error on API with max 5 retries:{}\n".format(
-                "\n".join(error_msgs)))
+        msg = ("Untreated error on API with max 5 retries:{}\n"
+               .format("\n".join(error_msgs)))
+
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
-    def get_cnpj_dataset(self, cnpj: str, dataset: str) -> dict:
-        """
-        Call BigData API to fecth a database for a CNPJ.
-
-        Retry for 5 times sleeping 1 second when errors are raised.
+    def _paginate(
+        self, url: str, payload: dict, headers: dict, dataset: str,
+        query_type: str, query_val: str) -> dict:
+        """Helper function to iterate through paginated responses.
 
         Args:
-            cnpj [str]: Company CNPJ.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
-            Information avaiable on BigData.
-        Raise:
-            BigDataCorpAPIException: Raise if errors in API occour.
+            url (str): Target API URL.
+            payload (dict): Request payload.
+            headers (dict): Request headers.
+            dataset (str): Requested dataset name.
+            query_type (str): Key for the query value in exception payloads.
+                Options: 'cpf', 'cnpj', 'process_number'.
+            query_val (str): The query identifier value.
+
+        Returns:
+            dict: The complete aggregated response dictionary.
+        """
+        first_page = self._send_request(
+            url, payload, headers, dataset, query_type, query_val)
+
+        result_list = first_page.get("Result", [])
+
+        if not result_list:
+            return first_page
+
+        result_obj = result_list[0]
+        dataset_key = "".join(word.capitalize() for word in dataset.split("_"))
+
+        if dataset_key not in result_obj:
+            # Fallback search
+            for key, val in result_obj.items():
+                if key.lower() != "matchkeys" and isinstance(val, dict):
+                    dataset_key = key
+                    break
+
+        dataset_dict = result_obj.get(dataset_key)
+        if not dataset_dict or not isinstance(dataset_dict, dict):
+            return first_page
+
+        while True:
+            next_page_id = dataset_dict.get("NextPageId")
+
+            if not next_page_id:
+                break
+
+            # Build payload for next page
+            next_payload = payload.copy()
+            next_payload["Datasets"] = f"{dataset}.next({next_page_id})"
+
+            # Send request for next page
+            next_page = self._send_request(
+                url, next_payload, headers, dataset, query_type, query_val)
+
+            # Get next dataset dict
+            next_result_list = next_page.get("Result", [])
+            if not next_result_list:
+                break
+
+            next_result_obj = next_result_list[0]
+            next_dataset_dict = next_result_obj.get(dataset_key)
+            if (not next_dataset_dict
+                or not isinstance(next_dataset_dict, dict)):
+                break
+
+            # Merge lists from next_dataset_dict into dataset_dict
+            for key, val in next_dataset_dict.items():
+                if isinstance(val, list):
+                    if (key in dataset_dict
+                        and isinstance(dataset_dict[key], list)):
+                        dataset_dict[key].extend(val)
+
+                    else:
+                        dataset_dict[key] = val
+
+            # Update next page ID
+            if "NextPageId" in next_dataset_dict:
+                dataset_dict["NextPageId"] = next_dataset_dict["NextPageId"]
+
+            else:
+                dataset_dict.pop("NextPageId", None)
+
+        return first_page
+
+    def list_cpf_dataset(self) -> list[str]:
+        """Return available BigData CPF dataset names.
+
+        Returns:
+            list[str]: Supported dataset identifiers for CPF queries.
+        """
+        return self.CPF_DATABASES
+
+    def list_cnpj_dataset(self) -> list[str]:
+        """Return available BigData CNPJ dataset names.
+
+        Returns:
+            list[str]: Supported dataset identifiers for CNPJ queries.
+        """
+        return self.CNPJ_DATABASES
+
+    def list_process_dataset(self) -> list[str]:
+        """Return available BigData process dataset names.
+
+        Returns:
+            list[str]: Supported dataset identifiers for process queries.
+        """
+        return self.PROCESS_DATABASES
+
+    def get_cpf_dataset(self, cpf: str, dataset: str,
+                        query_params: str = "") -> dict:
+        """Fetch a single CPF dataset from BigDataCorp.
+
+        Retries up to five times on transient HTTP errors. Paginated
+        responses are merged automatically.
+
+        Args:
+            cpf (str): Person CPF document number.
+            dataset (str): Dataset name; must be in ``CPF_DATABASES``.
+            query_params (str):
+                Optional suffix appended to the ``q`` query string.
+
+        Returns:
+            dict: Raw JSON response from the BigDataCorp API.
+
+        Raises:
+            BigDataCorpAPIException:
+                If ``dataset`` is not supported for CPF queries.
+            BigDataCorpAPIMinorDocumentException:
+                If the CPF belongs to a minor.
+            BigDataCorpAPILoginProblemException:
+                If authentication fails or the token expired.
+            BigDataCorpAPIInvalidInputException:
+                If the API reports an input validation error.
+            BigDataCorpAPIProblemAPIException:
+                If the API reports an internal service error.
+            BigDataCorpAPIOnDemandQueriesException:
+                If an on-demand query fails.
+            BigDataCorpAPIMonitoringAPIException:
+                If the monitoring or async API call fails.
+            BigDataCorpAPIUnmappedErrorException:
+                If the API returns an unmapped status code.
+            BigDataCorpAPIMaxRetryException:
+                If all retry attempts are exhausted.
+        """
+        if dataset not in self.CPF_DATABASES:
+            msg = (
+                "dataset [{dataset}] not avaiable on bigboost for CPF, "
+                "avaiable datasets:\n{datasets}").format(
+                dataset=dataset, datasets=", ".join(self.CPF_DATABASES))
+            raise BigDataCorpAPIException(msg)
+
+        if dataset in self.ONDEMAND_DATABASES:
+            url = "https://plataforma.bigdatacorp.com.br/ondemand"
+        else:
+            url = "https://bigboost.bigdatacorp.com.br/peoplev2"
+
+        payload = {
+            "Datasets": dataset,
+            "q": "doc{" + cpf + "}" + query_params,
+            "Limit": 1}
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "AccessToken": self._bigdata_auth_token}
+
+        return self._paginate(
+            url, payload, headers, dataset, "cpf", cpf)
+
+    def get_cnpj_dataset(self, cnpj: str, dataset: str,
+                         query_params: str = "") -> dict:
+        """Fetch a single CNPJ dataset from BigDataCorp.
+
+        Retries up to five times on transient HTTP errors. Paginated
+        responses are merged automatically.
+
+        Args:
+            cnpj (str): Company CNPJ document number.
+            dataset (str): Dataset name; must be in ``CNPJ_DATABASES``.
+            query_params (str):
+                Optional suffix appended to the ``q`` query string.
+
+        Returns:
+            dict: Raw JSON response from the BigDataCorp API.
+
+        Raises:
+            BigDataCorpAPIException:
+                If ``dataset`` is not supported for CNPJ queries.
+            BigDataCorpAPILoginProblemException:
+                If authentication fails or the token expired.
+            BigDataCorpAPIInvalidInputException:
+                If the API reports an input validation error.
+            BigDataCorpAPIProblemAPIException:
+                If the API reports an internal service error.
+            BigDataCorpAPIOnDemandQueriesException:
+                If an on-demand query fails.
+            BigDataCorpAPIMonitoringAPIException:
+                If the monitoring or async API call fails.
+            BigDataCorpAPIUnmappedErrorException:
+                If the API returns an unmapped status code.
+            BigDataCorpAPIMaxRetryException:
+                If all retry attempts are exhausted.
         """
         if dataset not in self.CNPJ_DATABASES:
             msg = (
@@ -333,115 +496,55 @@ class BigDataCorpAPI:
 
         if dataset in self.MARKETPLACE_DATABASES:
             url = "https://plataforma.bigdatacorp.com.br/marketplace"
+        elif dataset in self.ONDEMAND_DATABASES:
+            url = "https://plataforma.bigdatacorp.com.br/ondemand"
         else:
             url = "https://bigboost.bigdatacorp.com.br/companies"
 
         payload = {
             "Datasets": dataset,
-            "q": "doc{" + cnpj + "}",
+            "q": "doc{" + cnpj + "}" + query_params,
             "Limit": 1}
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
             "AccessToken": self._bigdata_auth_token}
 
-        error_msgs = []
-        for i in range(5):
-            try:
-                response = requests.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                response_json = response.json()
-                status_data = response_json['Status']
-
-                login_entry = status_data.get("login")
-                if login_entry is not None:
-                    login_return = login_entry[0]
-                    if login_return["Code"] == -101:
-                        msg = "BigBoost user has expired"
-                        raise BigDataCorpAPILoginProblemException(msg)
-
-                # Check if the CNPJ has a match
-                status = status_data[dataset][0]
-                if status['Code'] == 0:
-                    return response.json()
-                elif status['Code'] >= -202 and status['Code'] <= -100:
-                    raise BigDataCorpAPIInvalidInputException(
-                        message="error related to input data",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -1002 and status['Code'] <= -1000:
-                    raise BigDataCorpAPILoginProblemException(
-                        message="error related to login problem",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -2999 and status['Code'] <= -2000:
-                    raise BigDataCorpAPIProblemAPIException(
-                        message="error related to internal problems in APIs "
-                                "or services",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -1999 and status['Code'] <= -1200:
-                    raise BigDataCorpAPIOnDemandQueriesException(
-                        message="error related to on-demand queries",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-                elif status['Code'] <= -3000:
-                    raise BigDataCorpAPIMonitoringAPIException(
-                        message="error related to problems in the Monitoring "
-                                "API or Asynchronous Calls",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-                else:
-                    raise BigDataCorpAPIUnmappedErrorException(
-                        message="unmapped error",
-                        payload={
-                            'bigdata_status': status,
-                            'cnpj': cnpj,
-                            'dataset': dataset
-                        })
-
-            # Raise if document is invalid
-            except BigDataCorpAPIException as e:
-                raise e
-
-            except Exception as e:
-                error_msgs.append(str(e))
-                print("!!Error fetching BigData API:", str(e))
-
-        msg = (
-            "Untreated error on API with max 5 retries:{}\n".format(
-                "\n".join(error_msgs)))
-        raise BigDataCorpAPIMaxRetryException(
-            message=msg, payload={"errors": error_msgs})
-
+        return self._paginate(
+            url, payload, headers, dataset, "cnpj", cnpj)
 
     def get_process_dataset(self, process: str, dataset: str) -> dict:
-        """Call BigData API to fecth a database for a process.
+        """Fetch a single process dataset from BigDataCorp.
 
-        Retry for 5 times sleeping 1 second when errors are raised.
+        Retries up to five times on transient HTTP errors. Paginated
+        responses are merged automatically.
 
         Args:
-            process [str]: process number.
-            dataset [str]: Dataset on BigData that user should be fetched.
-        Return [dict]:
-            Information avaiable on BigData.
-        Raise:
-            BigDataCorpAPIException: Raise if errors in API occour.
+            process (str): Judicial process number.
+            dataset (str): Dataset name; must be in ``PROCESS_DATABASES``.
+
+        Returns:
+            dict: Raw JSON response from the BigDataCorp API.
+
+        Raises:
+            BigDataCorpAPIException:
+                If ``dataset`` is not supported for process queries.
+            BigDataCorpAPIEmptyEnrichedProcessException:
+                If the process query returns no enriched data.
+            BigDataCorpAPILoginProblemException:
+                If authentication fails or the token expired.
+            BigDataCorpAPIInvalidInputException:
+                If the API reports an input validation error.
+            BigDataCorpAPIProblemAPIException:
+                If the API reports an internal service error.
+            BigDataCorpAPIOnDemandQueriesException:
+                If an on-demand query fails.
+            BigDataCorpAPIMonitoringAPIException:
+                If the monitoring or async API call fails.
+            BigDataCorpAPIUnmappedErrorException:
+                If the API returns an unmapped status code.
+            BigDataCorpAPIMaxRetryException:
+                If all retry attempts are exhausted.
         """
         if dataset not in self.PROCESS_DATABASES:
             msg = (
@@ -461,138 +564,58 @@ class BigDataCorpAPI:
             "content-type": "application/json",
             "AccessToken": self._bigdata_auth_token}
 
-        error_msgs = []
-        for i in range(5):
-            try:
-                response = requests.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                response_json = response.json()
-                status_data = response_json['Status']
-                result_data = response_json.\
-                    get('Result', [{}])[0].\
-                    get('BasicData', {})
+        return self._paginate(
+            url, payload, headers, dataset, "process_number", process)
 
-                login_entry = status_data.get("login")
-                if login_entry is not None:
-                    login_return = login_entry[0]
-                    if login_return["Code"] == -101:
-                        msg = "BigBoost user has expired"
-                        raise BigDataCorpAPILoginProblemException(msg)
-
-                # Check if the process has a match
-                status = status_data[dataset][0]
-                if status['Code'] == 0 and result_data:
-                    return response.json()
-                elif not result_data:
-                    raise BigDataCorpAPIEmptyEnrichedProcessException(
-                        message="no process data returned",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -202 and status['Code'] <= -100:
-                    raise BigDataCorpAPIInvalidInputException(
-                        message="error related to input data",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -1002 and status['Code'] <= -1000:
-                    raise BigDataCorpAPILoginProblemException(
-                        message="error related to login problem",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -2999 and status['Code'] <= -2000:
-                    raise BigDataCorpAPIProblemAPIException(
-                        message="error related to internal problems in APIs "
-                                "or services",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                elif status['Code'] >= -1999 and status['Code'] <= -1200:
-                    raise BigDataCorpAPIOnDemandQueriesException(
-                        message="error related to on-demand queries",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                elif status['Code'] <= -3000:
-                    raise BigDataCorpAPIMonitoringAPIException(
-                        message="error related to problems in the Monitoring "
-                                "API or Asynchronous Calls",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-                else:
-                    raise BigDataCorpAPIUnmappedErrorException(
-                        message="unmapped error",
-                        payload={
-                            'bigdata_status': status,
-                            'process_number': process,
-                            'dataset': dataset
-                        })
-
-            # Raise if document is invalid
-            except BigDataCorpAPIException as e:
-                raise e
-
-            except Exception as e:
-                error_msgs.append(str(e))
-                print("!!Error fetching BigData API:", str(e))
-
-        msg = (
-            "Untreated error on API with max 5 retries:{}\n".format(
-                "\n".join(error_msgs)))
-        raise BigDataCorpAPIMaxRetryException(
-            message=msg, payload={"errors": error_msgs})
-
-    def get_cpf_datasets(self, cpf: str, datasets: list,
-                         verbosity: bool = False) -> dict:
-        """
-        Fetch a list of datasets and return a dictionary with all info.
+    def get_cpf_datasets(self, cpf: str, datasets: list[str],
+                         verbosity: bool = False,
+                         query_params: str = "") -> dict[str, dict]:
+        """Fetch multiple CPF datasets and return a keyed response dict.
 
         Args:
-            cpf [str]: Person's CPF.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
-            Return a dictionary with all dataset information, with keys
-            corresponding to dataset name.
+            cpf (str): Person CPF document number.
+            datasets (list[str]): Dataset names to fetch sequentially.
+            verbosity (bool):
+                When True, prints progress to stdout for each dataset.
+            query_params (str):
+                Optional suffix appended to the ``q`` query string.
+
+        Returns:
+            dict[str, dict]:
+                Mapping of dataset name to API response dictionary.
+
+        Raises:
+            BigDataCorpAPIException: See ``get_cpf_dataset`` for API errors.
         """
         response_dict = {}
         for db in datasets:
             if verbosity:
                 print("Fetching dataset:", db)
             response_dict[db] = self.get_cpf_dataset(
-                cpf=cpf, dataset=db)
+                cpf=cpf, dataset=db, query_params=query_params)
         return response_dict
 
-    def get_cnpj_datasets(self, cnpj: str, datasets: list,
-                          verbosity: bool = False) -> dict:
-        """
-        Fetch a list of datasets and return a dictionary with all info.
+    def get_cnpj_datasets(self, cnpj: str, datasets: list[str],
+                          verbosity: bool = False,
+                          query_params: str = "") -> dict[str, dict]:
+        """Fetch multiple CNPJ datasets and return a keyed response dict.
+
+        Strips punctuation from ``cnpj`` before querying.
 
         Args:
-            cnpj [str]: Company cnpj.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
-            Return a dictionary with all dataset information, with keys
-            corresponding to dataset name.
+            cnpj (str): Company CNPJ document number.
+            datasets (list[str]): Dataset names to fetch sequentially.
+            verbosity (bool):
+                When True, prints progress to stdout for each dataset.
+            query_params (str):
+                Optional suffix appended to the ``q`` query string.
+
+        Returns:
+            dict[str, dict]:
+                Mapping of dataset name to API response dictionary.
+
+        Raises:
+            BigDataCorpAPIException: See ``get_cnpj_dataset`` for API errors.
         """
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
@@ -600,23 +623,28 @@ class BigDataCorpAPI:
             if verbosity:
                 print("Fetching dataset:", db)
             response_dict[db] = self.get_cnpj_dataset(
-                cnpj=cnpj, dataset=db)
+                cnpj=cnpj, dataset=db, query_params=query_params)
         return response_dict
 
+    def get_process_datasets(self, process: str, datasets: list[str],
+                             verbosity: bool = False) -> dict[str, dict]:
+        """Fetch multiple process datasets and return a keyed response dict.
 
-    def get_process_datasets(self, process: str, datasets: list,
-                             verbosity: bool = False) -> dict:
-        """Fetch a list of datasets and return a dictionary with all info.
+        Strips punctuation from ``process`` before querying.
 
         Args:
-            process [str]: process number.
-            datasets [list[str]]: List of all datasets to be fetched.
-        Kwargs:
-            verbosity [bool]: If set true will print a msg for each dataset
-                fetch.
-        Returns [dict]:
-            Return a dictionary with all dataset information, with keys
-            corresponding to dataset name.
+            process (str): Judicial process number.
+            datasets (list[str]): Dataset names to fetch sequentially.
+            verbosity (bool):
+                When True, prints progress to stdout for each dataset.
+
+        Returns:
+            dict[str, dict]:
+                Mapping of dataset name to API response dictionary.
+
+        Raises:
+            BigDataCorpAPIException:
+                See ``get_process_dataset`` for API errors.
         """
         process = process.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
@@ -627,33 +655,30 @@ class BigDataCorpAPI:
                 process=process, dataset=db)
         return response_dict
 
+    def get_usage(
+            self, initial_date: str, final_date: str) -> list[dict]:
+        """Retrieve usage metrics for a date range across all datasets.
 
-    def get_usage(self, initial_date: str, final_date: str):
-        """
-        Retrieves usage data for a specified date range.
+        Queries the usage endpoint once per CPF and CNPJ dataset. Failed
+        requests are skipped silently and omitted from the result list.
 
-        Parameters:
-        - initial_date (str): The initial date of the range in the format
-            'yyyy-MM-dd'.
-        - final_date (str): The final date of the range in the format
-            'yyyy-MM-dd'.
+        Args:
+            initial_date (str):
+                Range start date in ``yyyy-MM-dd`` format.
+            final_date (str):
+                Range end date in ``yyyy-MM-dd`` format.
 
         Returns:
-        - results (list): A list of dictionaries containing the usage data for
-            each API and endpoint.
-          Each dictionary has the following keys:
-            - 'api_type' (str): The type of API ('people' or 'companies').
-            - 'end_point' (str): The endpoint of the API.
-            - 'successful_requests' (int): The total number of successful
-                requests made.
-            - 'requests_with_error' (int): The total number of requests
-                with errors.
-            - 'queries_charged' (int): The total number of queries charged.
-            - 'queries_not_charged' (int): The total number of queries
-                not charged.
-            - 'estimated_price' (float): The total estimated price
-                for the usage.
+            list[dict]:
+                One entry per successful dataset query. Each dict contains
+                ``api_type``, ``end_point``, ``successful_requests``,
+                ``requests_with_error``, ``queries_charged``,
+                ``queries_not_charged``, and ``estimated_price``.
 
+        Raises:
+            BigDataCorpAPIException:
+                Raised inside the per-dataset loop but caught and logged;
+                callers may receive a partial result list.
         """
         results = []
         url = "https://plataforma.bigdatacorp.com.br/usage"
@@ -732,3 +757,51 @@ class BigDataCorpAPI:
                 print(err)
 
         return results
+
+    def get_result_file(
+            self, dataset: str, json_data: dict) -> dict[str, str | bytes]:
+        """Download a certificate or result file from a prior API response.
+
+        Args:
+            dataset (str):
+                Top-level key in ``json_data`` that holds the certificate
+                payload.
+            json_data (dict):
+                Response dictionary returned by an on-demand dataset fetch.
+
+        Returns:
+            dict[str, str | bytes]:
+                ``file_type`` (str) and ``file_content`` (bytes).
+
+        Raises:
+            BigDataCorpAPIException:
+                If no file URL is found or the download request fails.
+        """
+        certificate_data = (json_data.get(dataset)
+                            .get('Result')[0]
+                            .get('OnlineCertificates')[0]
+                            .get('AdditionalOutputData'))
+
+        file_url = certificate_data.get("RawResultFile")
+        file_type = certificate_data.get("RawResultFileType", "").lower()
+        has_file = file_url is not None and file_url != ""
+
+        if not has_file:
+            raise BigDataCorpAPIException(
+                message="No file URL found for provided data.",
+                payload={"dataset": dataset,
+                         "json_data": json_data})
+
+        try:
+            response = requests.get(
+                file_url, headers={"accept": "*/*"}, timeout=30)
+            response.raise_for_status()
+
+        except requests.exceptions.RequestException as e:
+            raise BigDataCorpAPIException(message=str(e))
+
+        result = {'file_type': file_type,
+                  'file_content': response.content}
+
+        # Return raw content
+        return result

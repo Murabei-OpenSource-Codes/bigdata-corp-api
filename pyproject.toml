@@ -1,19 +1,20 @@
 [project]
 name = "bigdata-corp-api"
-version = "0.16"
+version = "0.18.2-b.0"
 description = "Python API to facilitate interaction with BigDataCorp end-points"
 readme = "README.md"
 requires-python = ">=3.6"
 license = { text = "BSD-3-Clause License" }
 authors = [
-    {name = "André Andrade Baceti", email = "a.baceti@murabei.com"}
+    {name = "Murabei Data Science", email = "a.baceti@murabei.com"}
 ]
+urls = { Homepage = "https://github.com/Murabei-OpenSource-Codes/bigdata-corp-api" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "requests"
+    "requests",
 ]
 
 [tool.poetry]
@@ -31,8 +32,6 @@ indent-width = 4
 exclude = [
   "secrets/",
   "__init__.py",
-  "setup_template.py",
-  "setup.py"
 ]
 
 # Lista de linters que serão aplicados. o ruff da suporte a vários e eles podem ser adicionados aqui.

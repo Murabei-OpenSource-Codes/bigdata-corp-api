@@ -12,6 +12,8 @@ dist/
 
 # Compiled Python bytecode
 *.py[cod]
+build/
+*.egg-info/
 
 # Log files
 *.log

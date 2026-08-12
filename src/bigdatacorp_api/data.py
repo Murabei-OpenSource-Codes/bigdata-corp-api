@@ -6,8 +6,13 @@ files from on-demand certificate endpoints.
 """
 from __future__ import annotations
 
-from loguru import logger
 import requests
+from loguru import logger
+
+# Configs
+from bigdatacorp_api.config import BIGDATACORP__REQUEST_TIMEOUT
+
+# Local imports
 from bigdatacorp_api.exceptions import (
     BigDataCorpAPIEmptyEnrichedProcessException,
     BigDataCorpAPIException,
@@ -20,8 +25,7 @@ from bigdatacorp_api.exceptions import (
     BigDataCorpAPIMonitoringAPIException,
     BigDataCorpAPIOnDemandQueriesException,
     BigDataCorpAPIProblemAPIException,
-    BigDataCorpAPIUnmappedErrorException,
-)
+    BigDataCorpAPIUnmappedErrorException,)
 
 
 class BigDataCorpAPI:
@@ -162,9 +166,8 @@ class BigDataCorpAPI:
         """
         self._bigdata_auth_token = bigdata_auth_token
 
-    def _send_request(
-        self, url: str, payload: dict, headers: dict, dataset: str,
-        query_type: str, query_val: str) -> dict:
+    def _send_request(self, url: str, payload: dict, headers: dict,
+                      dataset: str, query_type: str, query_val: str) -> dict:
         """Sends a request to BigData API with retry logic and error handling.
 
         Args:
@@ -196,10 +199,13 @@ class BigDataCorpAPI:
 
         for i in range(5):
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(
+                    url, json=payload, headers=headers,
+                    timeout=BIGDATACORP__REQUEST_TIMEOUT)
                 response.raise_for_status()
                 response_json = response.json()
                 status_data = response_json['Status']
+
                 # Treat minor validation error (CPF only)
                 birth_validation = status_data.get(
                     'date_of_birth_validation')
@@ -582,6 +588,11 @@ class BigDataCorpAPI:
                 When True, logs progress for each dataset.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
+            skip_errors (bool):
+                When True, skips errors and adds them to the response dict
+                with the dataset name as the key.
+                If False, raises an exception if an error occurs.
+                Default is False.
 
         Returns:
             dict[str, dict]:
@@ -598,6 +609,11 @@ class BigDataCorpAPI:
             try:
                 response_dict[db] = self.get_cpf_dataset(
                     cpf=cpf, dataset=db, query_params=query_params)
+            except BigDataCorpAPIInvalidInputException as e:
+                raise e
+
+            except BigDataCorpAPILoginProblemException as e:
+                raise e
 
             except Exception as e:
                 if skip_errors:
@@ -641,8 +657,14 @@ class BigDataCorpAPI:
             try:
                 response_dict[db] = self.get_cnpj_dataset(
                     cnpj=cnpj, dataset=db, query_params=query_params)
+            except BigDataCorpAPIInvalidInputException as e:
+                raise e
+
+            except BigDataCorpAPILoginProblemException as e:
+                raise e
+
             except Exception as e:
-                if db in skip_errors:
+                if skip_errors:
                     fetch_error[db] = str(e)
                 else:
                     raise e

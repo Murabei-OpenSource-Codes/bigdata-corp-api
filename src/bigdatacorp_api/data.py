@@ -403,7 +403,8 @@ class BigDataCorpAPI:
         return self.PROCESS_DATABASES
 
     def get_cpf_dataset(self, cpf: str, dataset: str,
-                        query_params: str = "") -> dict:
+                        query_params: str = "",
+                        request_parameters: dict = {}) -> dict:
         """Fetch a single CPF dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -454,6 +455,10 @@ class BigDataCorpAPI:
             "Datasets": dataset,
             "q": "doc{" + cpf + "}" + query_params,
             "Limit": 1}
+
+        # Add custom request parameters if provided
+        payload.update(request_parameters)
+
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
@@ -463,7 +468,8 @@ class BigDataCorpAPI:
             url, payload, headers, dataset, "cpf", cpf)
 
     def get_cnpj_dataset(self, cnpj: str, dataset: str,
-                         query_params: str = "") -> dict:
+                         query_params: str = "",
+                         request_parameters: dict = {}) -> dict:
         """Fetch a single CNPJ dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -514,6 +520,10 @@ class BigDataCorpAPI:
             "Datasets": dataset,
             "q": "doc{" + cnpj + "}" + query_params,
             "Limit": 1}
+
+        # Add custom request parameters if provided
+        payload.update(request_parameters)
+
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
@@ -522,7 +532,8 @@ class BigDataCorpAPI:
         return self._paginate(
             url, payload, headers, dataset, "cnpj", cnpj)
 
-    def get_process_dataset(self, process: str, dataset: str) -> dict:
+    def get_process_dataset(self, process: str, dataset: str,
+                            request_parameters: dict = {}) -> dict:
         """Fetch a single process dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -568,6 +579,10 @@ class BigDataCorpAPI:
             "Datasets": dataset,
             "q": "processnumber{" + process + "}",
             "Limit": 1}
+
+        # Add custom request parameters if provided
+        payload.update(request_parameters)
+
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
@@ -576,9 +591,31 @@ class BigDataCorpAPI:
         return self._paginate(
             url, payload, headers, dataset, "process_number", process)
 
+    def _validate_request_parameters(self, datasets: list[str],
+                                     request_parameters: dict) -> None:
+        """Validate the request parameters.
+
+        Args:
+            datasets (list[str]):
+                Dataset names to fetch sequentially.
+            request_parameters (dict):
+                Optional request parameters to be added to the request
+                payload.
+        """
+        parameters_keys_set = set(request_parameters.keys())
+        datasets_keys_set = set(datasets)
+        not_only_datasets_keys = parameters_keys_set - datasets_keys_set
+        if not_only_datasets_keys:
+            msg = (
+                "The request parameters keys must correspond to the "
+                "dataset names: {not_only_datasets_keys}").format(
+                    not_only_datasets_keys=not_only_datasets_keys)
+            raise ValueError(msg)
+
     def get_cpf_datasets(self, cpf: str, datasets: list[str],
                          verbosity: bool = False, query_params: str = "",
-                         skip_errors: bool = False) -> dict[str, dict]:
+                         skip_errors: bool = False,
+                         request_parameters: dict = None) -> dict[str, dict]:
         """Fetch multiple CPF datasets and return a keyed response dict.
 
         Args:
@@ -593,6 +630,10 @@ class BigDataCorpAPI:
                 with the dataset name as the key.
                 If False, raises an exception if an error occurs.
                 Default is False.
+            request_parameters (dict):
+                Optional request parameters to be added to the request
+                payload. Each key must correspond to a dataset name
+                that is in the ``datasets`` list.
 
         Returns:
             dict[str, dict]:
@@ -601,6 +642,12 @@ class BigDataCorpAPI:
         Raises:
             BigDataCorpAPIException: See ``get_cpf_dataset`` for API errors.
         """
+        if request_parameters is None:
+            request_parameters = {}
+
+        self._validate_request_parameters(
+            datasets=datasets, request_parameters=request_parameters)
+
         response_dict = {}
         fetch_error = {}
         for db in datasets:
@@ -628,7 +675,8 @@ class BigDataCorpAPI:
     def get_cnpj_datasets(self, cnpj: str, datasets: list[str],
                           verbosity: bool = False,
                           skip_errors: bool = False,
-                          query_params: str = "") -> dict[str, dict]:
+                          query_params: str = "",
+                          request_parameters: dict = None) -> dict[str, dict]:
         """Fetch multiple CNPJ datasets and return a keyed response dict.
 
         Strips punctuation from ``cnpj`` before querying.
@@ -648,6 +696,12 @@ class BigDataCorpAPI:
         Raises:
             BigDataCorpAPIException: See ``get_cnpj_dataset`` for API errors.
         """
+        if request_parameters is None:
+            request_parameters = {}
+
+        self._validate_request_parameters(
+            datasets=datasets, request_parameters=request_parameters)
+
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
         fetch_error = {}
@@ -655,8 +709,10 @@ class BigDataCorpAPI:
             if verbosity:
                 logger.info("Fetching dataset: {dataset}", dataset=db)
             try:
+                parameters = request_parameters.get(db, {})
                 response_dict[db] = self.get_cnpj_dataset(
-                    cnpj=cnpj, dataset=db, query_params=query_params)
+                    cnpj=cnpj, dataset=db, query_params=query_params,
+                    request_parameters=parameters)
             except BigDataCorpAPIInvalidInputException as e:
                 raise e
 
@@ -675,7 +731,8 @@ class BigDataCorpAPI:
 
     def get_process_datasets(self, process: str, datasets: list[str],
                              verbosity: bool = False,
-                             skip_errors: bool = False) -> dict[str, dict]:
+                             skip_errors: bool = False,
+                             request_parameters: dict = None) -> dict[str, dict]:
         """Fetch multiple process datasets and return a keyed response dict.
 
         Strips punctuation from ``process`` before querying.
@@ -701,6 +758,12 @@ class BigDataCorpAPI:
             BigDataCorpAPIException:
                 See ``get_process_dataset`` for API errors.
         """
+        if request_parameters is None:
+            request_parameters = {}
+
+        self._validate_request_parameters(
+            datasets=datasets, request_parameters=request_parameters)
+
         process = process.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
         fetch_error = {}
@@ -708,8 +771,10 @@ class BigDataCorpAPI:
             if verbosity:
                 logger.info("Fetching dataset: {dataset}", dataset=db)
             try:
+                parameters = request_parameters.get(db, {})
                 response_dict[db] = self.get_process_dataset(
-                    process=process, dataset=db)
+                    process=process, dataset=db,
+                    request_parameters=parameters)
             except Exception as e:
                 if db in skip_errors:
                     fetch_error[db] = str(e)
@@ -717,7 +782,6 @@ class BigDataCorpAPI:
                     raise e
         if fetch_error:
             response_dict['__errors__'] = fetch_error
-
         return response_dict
 
     def get_usage(

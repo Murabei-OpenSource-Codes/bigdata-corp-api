@@ -6,6 +6,7 @@ files from on-demand certificate endpoints.
 """
 from __future__ import annotations
 
+from loguru import logger
 import requests
 from bigdatacorp_api.exceptions import (
     BigDataCorpAPIEmptyEnrichedProcessException,
@@ -278,17 +279,16 @@ class BigDataCorpAPI:
 
             except Exception as e:
                 error_msgs.append(str(e))
-                print("!!Error fetching BigData API:", str(e))
+                logger.info(
+                    "Error fetching BigData API: {error}", error=str(e))
 
-        msg = ("Untreated error on API with max 5 retries:{}\n"
-               .format("\n".join(error_msgs)))
-
+        msg = "Untreated error on API with max 5 retries:{}\n"\
+            .format("\n".join(error_msgs))
         raise BigDataCorpAPIMaxRetryException(
             message=msg, payload={"errors": error_msgs})
 
-    def _paginate(
-        self, url: str, payload: dict, headers: dict, dataset: str,
-        query_type: str, query_val: str) -> dict:
+    def _paginate(self, url: str, payload: dict, headers: dict, dataset: str,
+                  query_type: str, query_val: str) -> dict:
         """Helper function to iterate through paginated responses.
 
         Args:
@@ -363,6 +363,9 @@ class BigDataCorpAPI:
             # Update next page ID
             if "NextPageId" in next_dataset_dict:
                 dataset_dict["NextPageId"] = next_dataset_dict["NextPageId"]
+                logger.info(
+                    "Next page ID: {next_page_id}",
+                    next_page_id=next_dataset_dict["NextPageId"])
 
             else:
                 dataset_dict.pop("NextPageId", None)
@@ -568,15 +571,15 @@ class BigDataCorpAPI:
             url, payload, headers, dataset, "process_number", process)
 
     def get_cpf_datasets(self, cpf: str, datasets: list[str],
-                         verbosity: bool = False,
-                         query_params: str = "") -> dict[str, dict]:
+                         verbosity: bool = False, query_params: str = "",
+                         skip_errors: bool = False) -> dict[str, dict]:
         """Fetch multiple CPF datasets and return a keyed response dict.
 
         Args:
             cpf (str): Person CPF document number.
             datasets (list[str]): Dataset names to fetch sequentially.
             verbosity (bool):
-                When True, prints progress to stdout for each dataset.
+                When True, logs progress for each dataset.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
 
@@ -588,15 +591,27 @@ class BigDataCorpAPI:
             BigDataCorpAPIException: See ``get_cpf_dataset`` for API errors.
         """
         response_dict = {}
+        fetch_error = {}
         for db in datasets:
             if verbosity:
-                print("Fetching dataset:", db)
-            response_dict[db] = self.get_cpf_dataset(
-                cpf=cpf, dataset=db, query_params=query_params)
+                logger.info("Fetching dataset: {dataset}", dataset=db)
+            try:
+                response_dict[db] = self.get_cpf_dataset(
+                    cpf=cpf, dataset=db, query_params=query_params)
+
+            except Exception as e:
+                if skip_errors:
+                    fetch_error[db] = str(e)
+                else:
+                    raise e
+
+        if fetch_error:
+            response_dict['__errors__'] = fetch_error
         return response_dict
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list[str],
                           verbosity: bool = False,
+                          skip_errors: bool = False,
                           query_params: str = "") -> dict[str, dict]:
         """Fetch multiple CNPJ datasets and return a keyed response dict.
 
@@ -606,7 +621,7 @@ class BigDataCorpAPI:
             cnpj (str): Company CNPJ document number.
             datasets (list[str]): Dataset names to fetch sequentially.
             verbosity (bool):
-                When True, prints progress to stdout for each dataset.
+                When True, logs progress for each dataset.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
 
@@ -619,24 +634,42 @@ class BigDataCorpAPI:
         """
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
+        fetch_error = {}
         for db in datasets:
             if verbosity:
-                print("Fetching dataset:", db)
-            response_dict[db] = self.get_cnpj_dataset(
-                cnpj=cnpj, dataset=db, query_params=query_params)
+                logger.info("Fetching dataset: {dataset}", dataset=db)
+            try:
+                response_dict[db] = self.get_cnpj_dataset(
+                    cnpj=cnpj, dataset=db, query_params=query_params)
+            except Exception as e:
+                if db in skip_errors:
+                    fetch_error[db] = str(e)
+                else:
+                    raise e
+
+        if fetch_error:
+            response_dict['__errors__'] = fetch_error
         return response_dict
 
     def get_process_datasets(self, process: str, datasets: list[str],
-                             verbosity: bool = False) -> dict[str, dict]:
+                             verbosity: bool = False,
+                             skip_errors: bool = False) -> dict[str, dict]:
         """Fetch multiple process datasets and return a keyed response dict.
 
         Strips punctuation from ``process`` before querying.
 
         Args:
-            process (str): Judicial process number.
-            datasets (list[str]): Dataset names to fetch sequentially.
+            process (str):
+                Judicial process number.
+            datasets (list[str]):
+                Dataset names to fetch sequentially.
             verbosity (bool):
-                When True, prints progress to stdout for each dataset.
+                When True, logs progress for each dataset.
+            skip_errors (bool):
+                When True, skips errors and adds them to the response dict
+                with the dataset name as the key.
+                If False, raises an exception if an error occurs.
+                Default is False.
 
         Returns:
             dict[str, dict]:
@@ -648,11 +681,21 @@ class BigDataCorpAPI:
         """
         process = process.replace(".", "").replace("/", "").replace("-", "")
         response_dict = {}
+        fetch_error = {}
         for db in datasets:
             if verbosity:
-                print("Fetching dataset:", db)
-            response_dict[db] = self.get_process_dataset(
-                process=process, dataset=db)
+                logger.info("Fetching dataset: {dataset}", dataset=db)
+            try:
+                response_dict[db] = self.get_process_dataset(
+                    process=process, dataset=db)
+            except Exception as e:
+                if db in skip_errors:
+                    fetch_error[db] = str(e)
+                else:
+                    raise e
+        if fetch_error:
+            response_dict['__errors__'] = fetch_error
+
         return response_dict
 
     def get_usage(
@@ -723,7 +766,9 @@ class BigDataCorpAPI:
                 })
 
             except Exception as err:
-                print(err)
+                logger.exception(
+                    "Usage query failed for dataset {dataset}: {error}",
+                    dataset=api, error=str(err))
 
         for api in self.CNPJ_DATABASES:
             payload["Api"] = "companies"
@@ -754,7 +799,9 @@ class BigDataCorpAPI:
                 })
 
             except Exception as err:
-                print(err)
+                logger.exception(
+                    "Usage query failed for dataset {dataset}: {error}",
+                    dataset=api, error=str(err))
 
         return results
 

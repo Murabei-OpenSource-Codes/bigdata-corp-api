@@ -38,11 +38,11 @@ class BigDataCorpAPIException(Exception):
         self.message = message
         self.payload = payload
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serialize the exception to a dictionary.
 
         Returns:
-            dict: Keys ``payload``, ``type``, and ``message``.
+            dict[str, object]: Keys ``payload``, ``type``, and ``message``.
         """
         rv = {
             "payload": self.payload,

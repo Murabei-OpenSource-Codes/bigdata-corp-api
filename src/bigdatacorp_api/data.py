@@ -7,10 +7,13 @@ files from on-demand certificate endpoints.
 from __future__ import annotations
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable
 from loguru import logger
 
 # Configs
-from bigdatacorp_api.config import BIGDATACORP__REQUEST_TIMEOUT
+from bigdatacorp_api.config import (
+    BIGDATACORP__N_PARALLEL, BIGDATACORP__REQUEST_TIMEOUT)
 
 # Local imports
 from bigdatacorp_api.exceptions import (
@@ -36,7 +39,7 @@ class BigDataCorpAPI:
     domain-specific exceptions.
     """
 
-    CPF_DATABASES = [
+    CPF_DATABASES: list[str] = [
         "government_debtors",
         "election_candidate_data",
         "circles_college_class",
@@ -76,8 +79,9 @@ class BigDataCorpAPI:
         "registration_data",
         "ondemand_pgfn_person",
         "ondemand_cert_debt_absence_by_state_person"]
+    """Supported dataset identifiers for CPF queries."""
 
-    CNPJ_DATABASES = [
+    CNPJ_DATABASES: list[str] = [
         "partner_murabei_credit_score_company",
         "government_debtors",
         "syndicate_agreements",
@@ -141,21 +145,25 @@ class BigDataCorpAPI:
         "registration_data",
         "ondemand_pgfn_company",
         "ondemand_cert_debt_absence_by_state_company"]
+    """Supported dataset identifiers for CNPJ queries."""
 
-    MARKETPLACE_DATABASES = [
+    MARKETPLACE_DATABASES: list[str] = [
         "partner_murabei_credit_score_company"
     ]
+    """CNPJ datasets routed to the marketplace endpoint."""
 
-    PROCESS_DATABASES = [
+    PROCESS_DATABASES: list[str] = [
         'basic_data',
         'cade_processes_data'
     ]
+    """Supported dataset identifiers for process queries."""
 
-    ONDEMAND_DATABASES = [
+    ONDEMAND_DATABASES: list[str] = [
         "ondemand_pgfn_person",
         "ondemand_cert_debt_absence_by_state_person",
         "ondemand_pgfn_company",
         "ondemand_cert_debt_absence_by_state_company"]
+    """Datasets routed to the on-demand certificate endpoint."""
 
     def __init__(self, bigdata_auth_token: str) -> None:
         """Initialize the API client.
@@ -168,7 +176,7 @@ class BigDataCorpAPI:
 
     def _send_request(self, url: str, payload: dict, headers: dict,
                       dataset: str, query_type: str, query_val: str) -> dict:
-        """Sends a request to BigData API with retry logic and error handling.
+        """Send a POST request to BigDataCorp with retries.
 
         Args:
             url (str): Target API URL.
@@ -294,8 +302,9 @@ class BigDataCorpAPI:
             message=msg, payload={"errors": error_msgs})
 
     def _paginate(self, url: str, payload: dict, headers: dict, dataset: str,
-                  query_type: str, query_val: str) -> dict:
-        """Helper function to iterate through paginated responses.
+                  query_type: str, query_val: str,
+                  dataset_params: str = "") -> dict:
+        """Iterate paginated responses and merge list fields.
 
         Args:
             url (str): Target API URL.
@@ -305,12 +314,20 @@ class BigDataCorpAPI:
             query_type (str): Key for the query value in exception payloads.
                 Options: 'cpf', 'cnpj', 'process_number'.
             query_val (str): The query identifier value.
+            dataset_params (str):
+                Suffix appended to ``dataset`` on each page request,
+                including ``.next(...)`` calls.
 
         Returns:
             dict: The complete aggregated response dictionary.
+
+        Raises:
+            BigDataCorpAPIException:
+                Same errors as ``_send_request`` for each page fetch.
         """
         first_page = self._send_request(
-            url, payload, headers, dataset, query_type, query_val)
+            url=url, payload=payload, headers=headers, dataset=dataset,
+            query_type=query_type, query_val=query_val)
 
         result_list = first_page.get("Result", [])
 
@@ -339,7 +356,13 @@ class BigDataCorpAPI:
 
             # Build payload for next page
             next_payload = payload.copy()
-            next_payload["Datasets"] = f"{dataset}.next({next_page_id})"
+            next_dataset = "{dataset}{dataset_params}.next({next_page_id})"\
+                .format(dataset=dataset, dataset_params=dataset_params,
+                        next_page_id=next_page_id)
+            logger.info(
+                "Next dataset: {next_dataset}",
+                next_dataset=next_dataset)
+            next_payload["Datasets"] = next_dataset
 
             # Send request for next page
             next_page = self._send_request(
@@ -369,9 +392,6 @@ class BigDataCorpAPI:
             # Update next page ID
             if "NextPageId" in next_dataset_dict:
                 dataset_dict["NextPageId"] = next_dataset_dict["NextPageId"]
-                logger.info(
-                    "Next page ID: {next_page_id}",
-                    next_page_id=next_dataset_dict["NextPageId"])
 
             else:
                 dataset_dict.pop("NextPageId", None)
@@ -404,7 +424,7 @@ class BigDataCorpAPI:
 
     def get_cpf_dataset(self, cpf: str, dataset: str,
                         query_params: str = "",
-                        request_parameters: dict = {}) -> dict:
+                        dataset_params: str = "") -> dict:
         """Fetch a single CPF dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -415,6 +435,10 @@ class BigDataCorpAPI:
             dataset (str): Dataset name; must be in ``CPF_DATABASES``.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
+            dataset_params (str):
+                Optional suffix appended to ``dataset`` in ``Datasets``.
+                Examples: ``.limit(10)`` or
+                ``{NextPageId}.limit(500)``.
 
         Returns:
             dict: Raw JSON response from the BigDataCorp API.
@@ -452,12 +476,9 @@ class BigDataCorpAPI:
             url = "https://bigboost.bigdatacorp.com.br/peoplev2"
 
         payload = {
-            "Datasets": dataset,
+            "Datasets": dataset + dataset_params,
             "q": "doc{" + cpf + "}" + query_params,
             "Limit": 1}
-
-        # Add custom request parameters if provided
-        payload.update(request_parameters)
 
         headers = {
             "accept": "application/json",
@@ -465,11 +486,13 @@ class BigDataCorpAPI:
             "AccessToken": self._bigdata_auth_token}
 
         return self._paginate(
-            url, payload, headers, dataset, "cpf", cpf)
+            url=url, payload=payload, headers=headers, dataset=dataset,
+            query_type="cpf", query_val=cpf,
+            dataset_params=dataset_params)
 
     def get_cnpj_dataset(self, cnpj: str, dataset: str,
                          query_params: str = "",
-                         request_parameters: dict = {}) -> dict:
+                         dataset_params: str = "") -> dict:
         """Fetch a single CNPJ dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -480,6 +503,10 @@ class BigDataCorpAPI:
             dataset (str): Dataset name; must be in ``CNPJ_DATABASES``.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
+            dataset_params (str):
+                Optional suffix appended to ``dataset`` in ``Datasets``.
+                Examples: ``.limit(10)`` or
+                ``{NextPageId}.limit(500)``.
 
         Returns:
             dict: Raw JSON response from the BigDataCorp API.
@@ -517,23 +544,21 @@ class BigDataCorpAPI:
             url = "https://bigboost.bigdatacorp.com.br/companies"
 
         payload = {
-            "Datasets": dataset,
+            "Datasets": dataset + dataset_params,
             "q": "doc{" + cnpj + "}" + query_params,
             "Limit": 1}
-
-        # Add custom request parameters if provided
-        payload.update(request_parameters)
 
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
             "AccessToken": self._bigdata_auth_token}
-
         return self._paginate(
-            url, payload, headers, dataset, "cnpj", cnpj)
+            url=url, payload=payload, headers=headers, dataset=dataset,
+            query_type="cnpj", query_val=cnpj, dataset_params=dataset_params)
 
     def get_process_dataset(self, process: str, dataset: str,
-                            request_parameters: dict = {}) -> dict:
+                            query_params: str = "",
+                            dataset_params: str = "") -> dict:
         """Fetch a single process dataset from BigDataCorp.
 
         Retries up to five times on transient HTTP errors. Paginated
@@ -542,6 +567,12 @@ class BigDataCorpAPI:
         Args:
             process (str): Judicial process number.
             dataset (str): Dataset name; must be in ``PROCESS_DATABASES``.
+            query_params (str):
+                Optional suffix appended to the ``q`` query string.
+            dataset_params (str):
+                Optional suffix appended to ``dataset`` in ``Datasets``.
+                Examples: ``.limit(10)`` or
+                ``{NextPageId}.limit(500)``.
 
         Returns:
             dict: Raw JSON response from the BigDataCorp API.
@@ -576,12 +607,9 @@ class BigDataCorpAPI:
         url = "https://plataforma.bigdatacorp.com.br/processos"
 
         payload = {
-            "Datasets": dataset,
-            "q": "processnumber{" + process + "}",
+            "Datasets": dataset + dataset_params,
+            "q": "processnumber{" + process + "}" + query_params,
             "Limit": 1}
-
-        # Add custom request parameters if provided
-        payload.update(request_parameters)
 
         headers = {
             "accept": "application/json",
@@ -589,207 +617,331 @@ class BigDataCorpAPI:
             "AccessToken": self._bigdata_auth_token}
 
         return self._paginate(
-            url, payload, headers, dataset, "process_number", process)
+            url=url, payload=payload, headers=headers, dataset=dataset,
+            query_type="process_number", query_val=process,
+            dataset_params=dataset_params)
 
-    def _validate_request_parameters(self, datasets: list[str],
-                                     request_parameters: dict) -> None:
-        """Validate the request parameters.
+    def _validate_dataset_mapping(
+            self, datasets: list[str], mapping: dict[str, str],
+            mapping_name: str) -> None:
+        """Validate that mapping keys are dataset names.
 
         Args:
             datasets (list[str]):
-                Dataset names to fetch sequentially.
-            request_parameters (dict):
-                Optional request parameters to be added to the request
-                payload.
+                Dataset names to fetch.
+            mapping (dict[str, str]):
+                Per-dataset suffix mapping.
+            mapping_name (str):
+                Parameter name used in the error message.
+
+        Raises:
+            ValueError:
+                If any mapping key is not in ``datasets``.
         """
-        parameters_keys_set = set(request_parameters.keys())
-        datasets_keys_set = set(datasets)
-        not_only_datasets_keys = parameters_keys_set - datasets_keys_set
-        if not_only_datasets_keys:
+        extra_keys = set(mapping.keys()) - set(datasets)
+        if extra_keys:
             msg = (
-                "The request parameters keys must correspond to the "
-                "dataset names: {not_only_datasets_keys}").format(
-                    not_only_datasets_keys=not_only_datasets_keys)
+                "The {mapping_name} keys must correspond to the "
+                "dataset names: {extra_keys}").format(
+                    mapping_name=mapping_name,
+                    extra_keys=extra_keys)
             raise ValueError(msg)
 
-    def get_cpf_datasets(self, cpf: str, datasets: list[str],
-                         verbosity: bool = False, query_params: str = "",
-                         skip_errors: bool = False,
-                         request_parameters: dict = None) -> dict[str, dict]:
-        """Fetch multiple CPF datasets and return a keyed response dict.
+    def _fetch_datasets_parallel(
+            self, datasets: list[str], fetch_fn: Callable[[str], dict],
+            verbosity: bool = False, skip_errors: bool = False,
+            max_workers: int | None = None) -> dict[str, dict]:
+        """Fetch datasets in parallel using a thread pool.
 
         Args:
-            cpf (str): Person CPF document number.
-            datasets (list[str]): Dataset names to fetch sequentially.
+            datasets (list[str]):
+                Dataset names to fetch.
+            fetch_fn (Callable[[str], dict]):
+                Callable that receives a dataset name and returns its
+                API response dictionary.
             verbosity (bool):
                 When True, logs progress for each dataset.
-            query_params (str):
-                Optional suffix appended to the ``q`` query string.
             skip_errors (bool):
-                When True, skips errors and adds them to the response dict
-                with the dataset name as the key.
-                If False, raises an exception if an error occurs.
-                Default is False.
-            request_parameters (dict):
-                Optional request parameters to be added to the request
-                payload. Each key must correspond to a dataset name
-                that is in the ``datasets`` list.
+                When True, soft-fail non-critical errors into
+                ``__errors__``. Login and invalid-input errors always
+                raise.
+            max_workers (int | None):
+                Maximum number of worker threads. Defaults to
+                ``BIGDATACORP__N_PARALLEL`` when None.
 
         Returns:
             dict[str, dict]:
                 Mapping of dataset name to API response dictionary.
+                Soft errors are stored under ``__errors__`` when
+                ``skip_errors`` is True.
 
         Raises:
-            BigDataCorpAPIException: See ``get_cpf_dataset`` for API errors.
+            BigDataCorpAPIInvalidInputException:
+                Always re-raised; pending futures are cancelled.
+            BigDataCorpAPILoginProblemException:
+                Always re-raised; pending futures are cancelled.
+            Exception:
+                Re-raised when ``skip_errors`` is False.
         """
-        if request_parameters is None:
-            request_parameters = {}
-
-        self._validate_request_parameters(
-            datasets=datasets, request_parameters=request_parameters)
+        if max_workers is None:
+            max_workers = BIGDATACORP__N_PARALLEL
 
         response_dict = {}
         fetch_error = {}
-        for db in datasets:
-            if verbosity:
-                logger.info("Fetching dataset: {dataset}", dataset=db)
-            try:
-                response_dict[db] = self.get_cpf_dataset(
-                    cpf=cpf, dataset=db, query_params=query_params)
-            except BigDataCorpAPIInvalidInputException as e:
-                raise e
+        workers = min(max_workers, max(len(datasets), 1))
 
-            except BigDataCorpAPILoginProblemException as e:
-                raise e
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_db = {}
+            for db in datasets:
+                if verbosity:
+                    logger.info(
+                        "Fetching dataset: {dataset}", dataset=db)
+                future = executor.submit(fetch_fn, db)
+                future_to_db[future] = db
 
-            except Exception as e:
-                if skip_errors:
-                    fetch_error[db] = str(e)
-                else:
+            for future in as_completed(future_to_db):
+                db = future_to_db[future]
+                try:
+                    response_dict[db] = future.result()
+                except (
+                        BigDataCorpAPIInvalidInputException,
+                        BigDataCorpAPILoginProblemException) as e:
+                    for pending in future_to_db:
+                        pending.cancel()
                     raise e
+                except Exception as e:
+                    if skip_errors:
+                        fetch_error[db] = str(e)
+                    else:
+                        for pending in future_to_db:
+                            pending.cancel()
+                        raise e
 
         if fetch_error:
             response_dict['__errors__'] = fetch_error
         return response_dict
+
+    def get_cpf_datasets(self, cpf: str, datasets: list[str],
+                         verbosity: bool = False,
+                         skip_errors: bool = False,
+                         query_params: dict[str, str] | None = None,
+                         dataset_params: dict[str, str] | None = None
+                         ) -> dict[str, dict]:
+        """Fetch multiple CPF datasets and return a keyed response dict.
+
+        Datasets are requested in parallel using a thread pool.
+
+        Args:
+            cpf (str): Person CPF document number.
+            datasets (list[str]): Dataset names to fetch in parallel.
+            verbosity (bool):
+                When True, logs progress for each dataset.
+            skip_errors (bool):
+                When True, non-critical errors are stored under
+                ``__errors__`` instead of raising. Login and
+                invalid-input errors always raise. Defaults to False.
+            query_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``q`` suffix string.
+                Example, ``{"processes": ", returnupdates{false}"}``.
+                Each key must be present in ``datasets``.
+            dataset_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``Datasets`` suffix.
+                Example:
+                ``{"processes": "{NextPageId}.limit(500)"}``.
+                Each key must be present in ``datasets``.
+
+        Returns:
+            dict[str, dict]:
+                Mapping of dataset name to API response dictionary.
+                Soft errors are stored under ``__errors__`` when
+                ``skip_errors`` is True.
+
+        Raises:
+            ValueError:
+                If ``query_params`` or ``dataset_params`` keys are not
+                in ``datasets``.
+            BigDataCorpAPIInvalidInputException:
+                Always re-raised; pending fetches are cancelled.
+            BigDataCorpAPILoginProblemException:
+                Always re-raised; pending fetches are cancelled.
+            BigDataCorpAPIException:
+                Other API errors from ``get_cpf_dataset`` when
+                ``skip_errors`` is False.
+        """
+        if query_params is None:
+            query_params = {}
+        if dataset_params is None:
+            dataset_params = {}
+
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=query_params,
+            mapping_name="query_params")
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=dataset_params,
+            mapping_name="dataset_params")
+
+        def fetch_fn(db: str) -> dict:
+            return self.get_cpf_dataset(
+                cpf=cpf, dataset=db,
+                query_params=query_params.get(db, ""),
+                dataset_params=dataset_params.get(db, ""))
+
+        return self._fetch_datasets_parallel(
+            datasets=datasets, fetch_fn=fetch_fn, verbosity=verbosity,
+            skip_errors=skip_errors)
 
     def get_cnpj_datasets(self, cnpj: str, datasets: list[str],
                           verbosity: bool = False,
                           skip_errors: bool = False,
-                          query_params: str = "",
-                          request_parameters: dict = None) -> dict[str, dict]:
+                          query_params: dict[str, str] | None = None,
+                          dataset_params: dict[str, str] | None = None
+                          ) -> dict[str, dict]:
         """Fetch multiple CNPJ datasets and return a keyed response dict.
 
-        Strips punctuation from ``cnpj`` before querying.
+        Strips punctuation from ``cnpj`` before querying. Datasets are
+        requested in parallel using a thread pool.
 
         Args:
             cnpj (str): Company CNPJ document number.
-            datasets (list[str]): Dataset names to fetch sequentially.
+            datasets (list[str]): Dataset names to fetch in parallel.
             verbosity (bool):
                 When True, logs progress for each dataset.
-            query_params (str):
-                Optional suffix appended to the ``q`` query string.
+            skip_errors (bool):
+                When True, non-critical errors are stored under
+                ``__errors__`` instead of raising. Login and
+                invalid-input errors always raise. Defaults to False.
+            query_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``q`` suffix string.
+                Example, ``{"processes": ", returnupdates{false}"}``.
+                Each key must be present in ``datasets``.
+            dataset_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``Datasets`` suffix.
+                Example:
+                ``{"processes": "{NextPageId}.limit(500)"}``.
+                Each key must be present in ``datasets``.
 
         Returns:
             dict[str, dict]:
                 Mapping of dataset name to API response dictionary.
+                Soft errors are stored under ``__errors__`` when
+                ``skip_errors`` is True.
 
         Raises:
-            BigDataCorpAPIException: See ``get_cnpj_dataset`` for API errors.
+            ValueError:
+                If ``query_params`` or ``dataset_params`` keys are not
+                in ``datasets``.
+            BigDataCorpAPIInvalidInputException:
+                Always re-raised; pending fetches are cancelled.
+            BigDataCorpAPILoginProblemException:
+                Always re-raised; pending fetches are cancelled.
+            BigDataCorpAPIException:
+                Other API errors from ``get_cnpj_dataset`` when
+                ``skip_errors`` is False.
         """
-        if request_parameters is None:
-            request_parameters = {}
+        if query_params is None:
+            query_params = {}
+        if dataset_params is None:
+            dataset_params = {}
 
-        self._validate_request_parameters(
-            datasets=datasets, request_parameters=request_parameters)
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=query_params,
+            mapping_name="query_params")
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=dataset_params,
+            mapping_name="dataset_params")
 
         cnpj = cnpj.replace(".", "").replace("/", "").replace("-", "")
-        response_dict = {}
-        fetch_error = {}
-        for db in datasets:
-            if verbosity:
-                logger.info("Fetching dataset: {dataset}", dataset=db)
-            try:
-                parameters = request_parameters.get(db, {})
-                response_dict[db] = self.get_cnpj_dataset(
-                    cnpj=cnpj, dataset=db, query_params=query_params,
-                    request_parameters=parameters)
-            except BigDataCorpAPIInvalidInputException as e:
-                raise e
 
-            except BigDataCorpAPILoginProblemException as e:
-                raise e
+        def fetch_fn(db: str) -> dict:
+            return self.get_cnpj_dataset(
+                cnpj=cnpj, dataset=db,
+                query_params=query_params.get(db, ""),
+                dataset_params=dataset_params.get(db, ""))
 
-            except Exception as e:
-                if skip_errors:
-                    fetch_error[db] = str(e)
-                else:
-                    raise e
-
-        if fetch_error:
-            response_dict['__errors__'] = fetch_error
-        return response_dict
+        return self._fetch_datasets_parallel(
+            datasets=datasets, fetch_fn=fetch_fn, verbosity=verbosity,
+            skip_errors=skip_errors)
 
     def get_process_datasets(self, process: str, datasets: list[str],
                              verbosity: bool = False,
                              skip_errors: bool = False,
-                             request_parameters: dict = None) -> dict[str, dict]:
+                             query_params: dict[str, str] | None = None,
+                             dataset_params: dict[str, str] | None = None
+                             ) -> dict[str, dict]:
         """Fetch multiple process datasets and return a keyed response dict.
 
-        Strips punctuation from ``process`` before querying.
+        Strips punctuation from ``process`` before querying. Datasets are
+        requested in parallel using a thread pool.
 
         Args:
             process (str):
                 Judicial process number.
             datasets (list[str]):
-                Dataset names to fetch sequentially.
+                Dataset names to fetch in parallel.
             verbosity (bool):
                 When True, logs progress for each dataset.
             skip_errors (bool):
-                When True, skips errors and adds them to the response dict
-                with the dataset name as the key.
-                If False, raises an exception if an error occurs.
-                Default is False.
+                When True, non-critical errors are stored under
+                ``__errors__`` instead of raising. Login and
+                invalid-input errors always raise. Defaults to False.
+            query_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``q`` suffix string.
+                Each key must be present in ``datasets``.
+            dataset_params (dict[str, str] | None):
+                Optional mapping of dataset name to ``Datasets`` suffix.
+                Example:
+                ``{"basic_data": "{NextPageId}.limit(500)"}``.
+                Each key must be present in ``datasets``.
 
         Returns:
             dict[str, dict]:
                 Mapping of dataset name to API response dictionary.
+                Soft errors are stored under ``__errors__`` when
+                ``skip_errors`` is True.
 
         Raises:
+            ValueError:
+                If ``query_params`` or ``dataset_params`` keys are not
+                in ``datasets``.
+            BigDataCorpAPIInvalidInputException:
+                Always re-raised; pending fetches are cancelled.
+            BigDataCorpAPILoginProblemException:
+                Always re-raised; pending fetches are cancelled.
             BigDataCorpAPIException:
-                See ``get_process_dataset`` for API errors.
+                Other API errors from ``get_process_dataset`` when
+                ``skip_errors`` is False.
         """
-        if request_parameters is None:
-            request_parameters = {}
+        if query_params is None:
+            query_params = {}
+        if dataset_params is None:
+            dataset_params = {}
 
-        self._validate_request_parameters(
-            datasets=datasets, request_parameters=request_parameters)
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=query_params,
+            mapping_name="query_params")
+        self._validate_dataset_mapping(
+            datasets=datasets, mapping=dataset_params,
+            mapping_name="dataset_params")
 
         process = process.replace(".", "").replace("/", "").replace("-", "")
-        response_dict = {}
-        fetch_error = {}
-        for db in datasets:
-            if verbosity:
-                logger.info("Fetching dataset: {dataset}", dataset=db)
-            try:
-                parameters = request_parameters.get(db, {})
-                response_dict[db] = self.get_process_dataset(
-                    process=process, dataset=db,
-                    request_parameters=parameters)
-            except Exception as e:
-                if db in skip_errors:
-                    fetch_error[db] = str(e)
-                else:
-                    raise e
-        if fetch_error:
-            response_dict['__errors__'] = fetch_error
-        return response_dict
+
+        def fetch_fn(db: str) -> dict:
+            return self.get_process_dataset(
+                process=process, dataset=db,
+                query_params=query_params.get(db, ""),
+                dataset_params=dataset_params.get(db, ""))
+
+        return self._fetch_datasets_parallel(
+            datasets=datasets, fetch_fn=fetch_fn, verbosity=verbosity,
+            skip_errors=skip_errors)
 
     def get_usage(
             self, initial_date: str, final_date: str) -> list[dict]:
         """Retrieve usage metrics for a date range across all datasets.
 
         Queries the usage endpoint once per CPF and CNPJ dataset. Failed
-        requests are skipped silently and omitted from the result list.
+        requests are logged and omitted from the result list; this method
+        does not propagate those errors to the caller.
 
         Args:
             initial_date (str):
@@ -803,11 +955,6 @@ class BigDataCorpAPI:
                 ``api_type``, ``end_point``, ``successful_requests``,
                 ``requests_with_error``, ``queries_charged``,
                 ``queries_not_charged``, and ``estimated_price``.
-
-        Raises:
-            BigDataCorpAPIException:
-                Raised inside the per-dataset loop but caught and logged;
-                callers may receive a partial result list.
         """
         results = []
         url = "https://plataforma.bigdatacorp.com.br/usage"
@@ -901,6 +1048,8 @@ class BigDataCorpAPI:
                 payload.
             json_data (dict):
                 Response dictionary returned by an on-demand dataset fetch.
+                Must contain ``Result`` / ``OnlineCertificates`` /
+                ``AdditionalOutputData`` under ``dataset``.
 
         Returns:
             dict[str, str | bytes]:
@@ -909,6 +1058,9 @@ class BigDataCorpAPI:
         Raises:
             BigDataCorpAPIException:
                 If no file URL is found or the download request fails.
+            AttributeError:
+                If ``json_data`` does not match the expected certificate
+                structure.
         """
         certificate_data = (json_data.get(dataset)
                             .get('Result')[0]

@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.18.7] - 2026-08-13
+
+### Added
+
+- `bigdatacorp_api.config` — `BIGDATACORP__REQUEST_TIMEOUT` (default 60)
+  and `BIGDATACORP__N_PARALLEL` (default 8)
+- `skip_errors` on `get_cpf_datasets`, `get_cnpj_datasets`, and
+  `get_process_datasets`; non-critical failures are stored under
+  `__errors__`. Login and invalid-input errors still raise
+- `query_params` on `get_process_dataset` and `get_process_datasets`
+- `dataset_params` on `get_cpf_dataset`, `get_cnpj_dataset`,
+  `get_process_dataset`, and the batch helpers; suffix is appended to
+  the `Datasets` field and kept on paginated `.next(...)` calls
+
+### Changed
+
+- Batch `query_params` is a mapping of dataset name to `q` suffix
+  (`dict[str, str]`), not a single string applied to every dataset
+- Batch fetches run in a thread pool bounded by
+  `BIGDATACORP__N_PARALLEL`
+- Dataset POST requests use `BIGDATACORP__REQUEST_TIMEOUT`
+- Batch `verbosity` logs with loguru instead of `print`
+- Integration tests split into `test__bigdata_cpf_api.py` and
+  `test__bigdata_cnpj_api.py`
+- Public docstrings and types aligned with skip-errors, query-param,
+  and dataset-param behavior
+
 ## [0.18.2] - 2026-08-04
 ### Added
 

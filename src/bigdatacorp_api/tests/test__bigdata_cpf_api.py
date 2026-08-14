@@ -22,6 +22,16 @@ class TestBigDataCorpCPFAPI(unittest.TestCase):
         bigdata_api.get_cpf_dataset(
             cpf=TEST_CPF, dataset="basic_data")
 
+    def test__processes(self) -> None:
+        """Fetch ``processes`` for a valid CPF."""
+        bigdata_api = BigDataCorpAPI(
+            bigdata_auth_token=BIGDATA_AUTH_TOKEN)
+        process_data = bigdata_api.get_cpf_dataset(
+            cpf=TEST_CPF, dataset="processes",
+            query_params=", returnupdates{false}, partieslimit{0}",
+            dataset_params="{NextPageId,Lawsuits.Number,Lawsuits.Type,Lawsuits.MainSubject,Lawsuits.CourtName,Lawsuits.CourtLevel,Lawsuits.CourtType,Lawsuits.CourtDistrict,Lawsuits.State}.limit(500)") # NOQA
+        len(process_data['Result'][0]['Processes']['Lawsuits'])
+
     def test__invalid(self) -> None:
         """Raise when the CPF document number is invalid."""
         bigdata_api = BigDataCorpAPI(

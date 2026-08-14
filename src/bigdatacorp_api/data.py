@@ -4,8 +4,6 @@ Exposes ``BigDataCorpAPI`` for fetching CPF, CNPJ, and process datasets,
 aggregating paginated responses, reporting usage, and downloading result
 files from on-demand certificate endpoints.
 """
-from __future__ import annotations
-
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
@@ -19,8 +17,6 @@ from bigdatacorp_api.config import (
 from bigdatacorp_api.exceptions import (
     BigDataCorpAPIEmptyEnrichedProcessException,
     BigDataCorpAPIException,
-    BigDataCorpAPIInvalidDatabaseException,
-    BigDataCorpAPIInvalidDocumentException,
     BigDataCorpAPIInvalidInputException,
     BigDataCorpAPILoginProblemException,
     BigDataCorpAPIMaxRetryException,
@@ -179,29 +175,42 @@ class BigDataCorpAPI:
         """Send a POST request to BigDataCorp with retries.
 
         Args:
-            url (str): Target API URL.
-            payload (dict): Request payload.
-            headers (dict): Request headers.
-            dataset (str): Requested dataset name.
-            query_type (str): Key for the query value in exception payloads.
-                Options: 'cpf', 'cnpj', 'process_number'.
+            url (str):
+                Target API URL.
+            payload (dict):
+                Request payload.
+            headers (dict):
+                Request headers.
+            dataset (str):
+                Requested dataset name.
+            query_type (str):
+                Key for the query value in exception payloads.
+                Options: ['cpf', 'cnpj', 'process_number'].
             query_val (str): The query identifier value.
 
         Returns:
-            dict: The response JSON dictionary.
+            dict:
+                The response JSON dictionary.
 
         Raises:
-            BigDataCorpAPIMinorDocumentException: If the CPF is of a minor.
-            BigDataCorpAPILoginProblemException: If login fails or expires.
-            BigDataCorpAPIEmptyEnrichedProcessException: If process data is
-                empty.
-            BigDataCorpAPIInvalidInputException: If there's an input error.
-            BigDataCorpAPIProblemAPIException: If there is an internal API
-                problem.
-            BigDataCorpAPIOnDemandQueriesException: If on-demand query fails.
-            BigDataCorpAPIMonitoringAPIException: If monitoring API fails.
-            BigDataCorpAPIUnmappedErrorException: For any other API error.
-            BigDataCorpAPIMaxRetryException: If all retries fail.
+            BigDataCorpAPIMinorDocumentException:
+                If the CPF is of a minor.
+            BigDataCorpAPILoginProblemException:
+                If login fails or expires.
+            BigDataCorpAPIEmptyEnrichedProcessException:
+                If process data is empty.
+            BigDataCorpAPIInvalidInputException:
+                If there's an input error.
+            BigDataCorpAPIProblemAPIException:
+                If there is an internal API problem.
+            BigDataCorpAPIOnDemandQueriesException:
+                If on-demand query fails.
+            BigDataCorpAPIMonitoringAPIException:
+                If monitoring API fails.
+            BigDataCorpAPIUnmappedErrorException:
+                For any other API error.
+            BigDataCorpAPIMaxRetryException:
+                If all retries fail.
         """
         error_msgs = []
 
@@ -307,19 +316,26 @@ class BigDataCorpAPI:
         """Iterate paginated responses and merge list fields.
 
         Args:
-            url (str): Target API URL.
-            payload (dict): Request payload.
-            headers (dict): Request headers.
-            dataset (str): Requested dataset name.
-            query_type (str): Key for the query value in exception payloads.
-                Options: 'cpf', 'cnpj', 'process_number'.
-            query_val (str): The query identifier value.
+            url (str):
+                Target API URL.
+            payload (dict):
+                Request payload.
+            headers (dict):
+                Request headers.
+            dataset (str):
+                Requested dataset name.
+            query_type (str):
+                Key for the query value in exception payloads.
+                Options: ['cpf', 'cnpj', 'process_number'].
+            query_val (str):
+                The query identifier value.
             dataset_params (str):
                 Suffix appended to ``dataset`` on each page request,
                 including ``.next(...)`` calls.
 
         Returns:
-            dict: The complete aggregated response dictionary.
+            dict:
+                The complete aggregated response dictionary.
 
         Raises:
             BigDataCorpAPIException:
@@ -410,7 +426,8 @@ class BigDataCorpAPI:
         """Return available BigData CNPJ dataset names.
 
         Returns:
-            list[str]: Supported dataset identifiers for CNPJ queries.
+            list[str]:
+                Supported dataset identifiers for CNPJ queries.
         """
         return self.CNPJ_DATABASES
 
@@ -418,7 +435,8 @@ class BigDataCorpAPI:
         """Return available BigData process dataset names.
 
         Returns:
-            list[str]: Supported dataset identifiers for process queries.
+            list[str]:
+                Supported dataset identifiers for process queries.
         """
         return self.PROCESS_DATABASES
 
@@ -431,8 +449,10 @@ class BigDataCorpAPI:
         responses are merged automatically.
 
         Args:
-            cpf (str): Person CPF document number.
-            dataset (str): Dataset name; must be in ``CPF_DATABASES``.
+            cpf (str):
+                Person CPF document number.
+            dataset (str):
+                Dataset name; must be in ``CPF_DATABASES``.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
             dataset_params (str):
@@ -499,8 +519,10 @@ class BigDataCorpAPI:
         responses are merged automatically.
 
         Args:
-            cnpj (str): Company CNPJ document number.
-            dataset (str): Dataset name; must be in ``CNPJ_DATABASES``.
+            cnpj (str):
+                Company CNPJ document number.
+            dataset (str):
+                Dataset name; must be in ``CNPJ_DATABASES``.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
             dataset_params (str):
@@ -509,7 +531,8 @@ class BigDataCorpAPI:
                 ``{NextPageId}.limit(500)``.
 
         Returns:
-            dict: Raw JSON response from the BigDataCorp API.
+            dict:
+                Raw JSON response from the BigDataCorp API.
 
         Raises:
             BigDataCorpAPIException:
@@ -565,8 +588,10 @@ class BigDataCorpAPI:
         responses are merged automatically.
 
         Args:
-            process (str): Judicial process number.
-            dataset (str): Dataset name; must be in ``PROCESS_DATABASES``.
+            process (str):
+                Judicial process number.
+            dataset (str):
+                Dataset name; must be in ``PROCESS_DATABASES``.
             query_params (str):
                 Optional suffix appended to the ``q`` query string.
             dataset_params (str):
@@ -575,7 +600,8 @@ class BigDataCorpAPI:
                 ``{NextPageId}.limit(500)``.
 
         Returns:
-            dict: Raw JSON response from the BigDataCorp API.
+            dict:
+                Raw JSON response from the BigDataCorp API.
 
         Raises:
             BigDataCorpAPIException:
@@ -732,8 +758,10 @@ class BigDataCorpAPI:
         Datasets are requested in parallel using a thread pool.
 
         Args:
-            cpf (str): Person CPF document number.
-            datasets (list[str]): Dataset names to fetch in parallel.
+            cpf (str):
+                Person CPF document number.
+            datasets (list[str]):
+                Dataset names to fetch in parallel.
             verbosity (bool):
                 When True, logs progress for each dataset.
             skip_errors (bool):
@@ -746,8 +774,7 @@ class BigDataCorpAPI:
                 Each key must be present in ``datasets``.
             dataset_params (dict[str, str] | None):
                 Optional mapping of dataset name to ``Datasets`` suffix.
-                Example:
-                ``{"processes": "{NextPageId}.limit(500)"}``.
+                Ex. ``{"processes": "{NextPageId}.limit(500)"}``.
                 Each key must be present in ``datasets``.
 
         Returns:
@@ -802,8 +829,10 @@ class BigDataCorpAPI:
         requested in parallel using a thread pool.
 
         Args:
-            cnpj (str): Company CNPJ document number.
-            datasets (list[str]): Dataset names to fetch in parallel.
+            cnpj (str):
+                Company CNPJ document number.
+            datasets (list[str]):
+                Dataset names to fetch in parallel.
             verbosity (bool):
                 When True, logs progress for each dataset.
             skip_errors (bool):
@@ -816,8 +845,7 @@ class BigDataCorpAPI:
                 Each key must be present in ``datasets``.
             dataset_params (dict[str, str] | None):
                 Optional mapping of dataset name to ``Datasets`` suffix.
-                Example:
-                ``{"processes": "{NextPageId}.limit(500)"}``.
+                Ex. ``{"processes": "{NextPageId}.limit(500)"}``.
                 Each key must be present in ``datasets``.
 
         Returns:
@@ -889,8 +917,7 @@ class BigDataCorpAPI:
                 Each key must be present in ``datasets``.
             dataset_params (dict[str, str] | None):
                 Optional mapping of dataset name to ``Datasets`` suffix.
-                Example:
-                ``{"basic_data": "{NextPageId}.limit(500)"}``.
+                Ex. ``{"basic_data": "{NextPageId}.limit(500)"}``.
                 Each key must be present in ``datasets``.
 
         Returns:

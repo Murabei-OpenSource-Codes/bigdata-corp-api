@@ -5,15 +5,18 @@ class BigDataCorpAPIException(Exception):
     """Base exception for BigDataCorp API client errors.
 
     Attributes:
-        message (str): Human-readable error description.
-        payload (dict): Optional context returned by the API or client.
+        message (str):
+            Human-readable error description.
+        payload (dict):
+            Optional context returned by the API or client.
     """
 
     def __repr__(self) -> str:
         """Return the exception representation.
 
         Returns:
-            str: Class name and message formatted for display.
+            str:
+                Class name and message formatted for display.
         """
         template = "{class_name}: {message}"
         return template.format(
@@ -24,7 +27,8 @@ class BigDataCorpAPIException(Exception):
         """Return the string representation of the exception.
 
         Returns:
-            str: Same value as ``repr(self)``.
+            str:
+                Same value as ``repr(self)``.
         """
         return self.__repr__()
 
@@ -32,8 +36,10 @@ class BigDataCorpAPIException(Exception):
         """Initialize the exception.
 
         Args:
-            message (str): Human-readable error description.
-            payload (dict): Optional context for debugging or logging.
+            message (str):
+                Human-readable error description.
+            payload (dict):
+                Optional context for debugging or logging.
         """
         self.message = message
         self.payload = payload
@@ -42,7 +48,8 @@ class BigDataCorpAPIException(Exception):
         """Serialize the exception to a dictionary.
 
         Returns:
-            dict[str, object]: Keys ``payload``, ``type``, and ``message``.
+            dict[str, object]:
+                Keys ``payload``, ``type``, and ``message``.
         """
         rv = {
             "payload": self.payload,

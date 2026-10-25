@@ -122,7 +122,8 @@ file_data = api.get_result_file(
 ## Configuration
 
 The auth token is passed to `BigDataCorpAPI` at construction time. Timeout
-and batch parallelism are read from the environment when set.
+and batch parallelism are read from the environment when set. A blank
+value keeps the default. Any other value must be a positive integer.
 
 | Variable | Required | Description |
 |----------|----------|-------------|

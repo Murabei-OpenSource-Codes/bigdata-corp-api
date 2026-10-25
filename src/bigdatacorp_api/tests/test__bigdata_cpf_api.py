@@ -40,4 +40,5 @@ class TestBigDataCorpCPFAPI(unittest.TestCase):
                 BigDataCorpAPIInvalidDocumentException) as context:
             bigdata_api.get_cpf_dataset(
                 cpf=TEST_CPF + "0", dataset="basic_data")
-        self.assertEqual(context.exception.message, 'cpf is invalid')
+        self.assertEqual(
+            context.exception.message, "cpf [{cpf}] não é válido")

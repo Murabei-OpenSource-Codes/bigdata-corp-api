@@ -5,6 +5,61 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.18.9] - 2026-10-26
+
+### Fixed
+
+- `pyproject_template.toml` — removed a stray `]` after `dependencies`
+
+### Changed
+
+- `paginate` — follow-up page names are logged at debug level
+
+## [0.18.8] - 2026-10-25
+
+### Added
+
+- `tenacity` — `send_request` retries transport failures with
+  exponential backoff
+- `BIGDATACORP__MAX_PAGES` (default `200`) — stop pagination on the
+  page cap, a repeated `NextPageId`, or a missing next-page dataset
+  object, and log a warning
+- `validate_cpf`, `validate_cnpj`, and `validate_cnj` — check the
+  document locally before the HTTP call
+- `bigdata_raise_for_status` and
+  `BigDataCorpAPIPayloadStatusException` — map status codes to a
+  message and attach `bigdata_response` on the payload
+- `BigDataCorpAPIQueryParametersException`,
+  `BigDataCorpAPIRestrictedDocumentException`, and
+  `BigDataCorpAPILoginException`
+- `BigDataCorpAPIException.format_message` and `to_dict`
+
+### Changed
+
+- `BigDataCorpAPI` is composed from `aux` mixins. The import path stays
+  `bigdatacorp_api.data`
+- `send_request` retries connection errors, timeouts, HTTP 429, and
+  HTTP 5xx up to five times, then re-raises that transport error
+- Status handling uses explicit codes. Callers that caught
+  `BigDataCorpAPIInvalidInputException` or
+  `BigDataCorpAPILoginProblemException` need the new classes
+- A positive status code that is not in a map no longer raises
+- A response without `Status` is returned. It is not retried
+- `requests` is pinned to `>=2.32.5,<3`
+- Blank `BIGDATACORP__REQUEST_TIMEOUT` and `BIGDATACORP__N_PARALLEL`
+  keep the default. Any other value must be a positive integer
+- `BigDataCorpAPIMaxRetryException` is not raised. The class remains
+  so existing imports still resolve
+
+### Removed
+
+- `BigDataCorpAPILoginProblemException`
+- `BigDataCorpAPIInvalidInputException`
+- `BigDataCorpAPIMinorDocumentException` — minor-document codes raise
+  `BigDataCorpAPIRestrictedDocumentException`
+- `BigDataCorpAPIEmptyEnrichedProcessException` — an empty process
+  result is returned instead of raised
+
 ## [0.18.7] - 2026-08-13
 
 ### Added

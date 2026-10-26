@@ -3,13 +3,11 @@ import os
 import unittest
 from bigdatacorp_api.data import BigDataCorpAPI
 from bigdatacorp_api.exceptions import (
-    BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
-    BigDataCorpAPIMaxRetryException)
+    BigDataCorpAPIInvalidDocumentException)
 
 
 BIGDATA_AUTH_TOKEN = os.environ.get("BIGDATA_AUTH_TOKEN")
 TEST_CPF = os.environ.get("TEST_CPF")
-TEST_CNPJ = os.environ.get("TEST_CNPJ")
 
 
 class TestBigDataCorpCPFAPI(unittest.TestCase):
@@ -23,14 +21,16 @@ class TestBigDataCorpCPFAPI(unittest.TestCase):
             cpf=TEST_CPF, dataset="basic_data")
 
     def test__processes(self) -> None:
-        """Fetch ``processes`` for a valid CPF."""
+        """Fetch ``processes`` without lawsuit updates."""
         bigdata_api = BigDataCorpAPI(
             bigdata_auth_token=BIGDATA_AUTH_TOKEN)
         process_data = bigdata_api.get_cpf_dataset(
             cpf=TEST_CPF, dataset="processes",
             query_params=", returnupdates{false}, partieslimit{0}",
             dataset_params="{NextPageId,Lawsuits.Number,Lawsuits.Type,Lawsuits.MainSubject,Lawsuits.CourtName,Lawsuits.CourtLevel,Lawsuits.CourtType,Lawsuits.CourtDistrict,Lawsuits.State}.limit(500)") # NOQA
-        len(process_data['Result'][0]['Processes']['Lawsuits'])
+        lawsuits = process_data['Result'][0]['Processes']['Lawsuits']
+        lawsuits_data = lawsuits[0]
+        self.assertNotIn("Updates", lawsuits_data.keys())
 
     def test__invalid(self) -> None:
         """Raise when the CPF document number is invalid."""

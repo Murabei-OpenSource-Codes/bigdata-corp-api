@@ -256,7 +256,7 @@ class BaseBigDataCorpAPIMixin:
             next_dataset = "{dataset}{dataset_params}.next({next_page_id})"\
                 .format(dataset=dataset, dataset_params=dataset_params,
                         next_page_id=next_page_id)
-            logger.info(
+            logger.debug(
                 "Next dataset: {next_dataset}",
                 next_dataset=next_dataset)
             next_payload["Datasets"] = next_dataset

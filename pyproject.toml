@@ -1,6 +1,6 @@
 [project]
 name = "bigdata-corp-api"
-version = "0.18.8-b.0"
+version = "0.18.9-b.0"
 description = "Python API to facilitate interaction with BigDataCorp end-points"
 readme = "README.md"
 requires-python = ">=3.6"
@@ -17,7 +17,6 @@ dependencies = [
     "loguru",
     "requests (>=2.32.5,<3.0.0)",
     "tenacity (>=9.1.4,<10.0.0)"
-]
 ]
 
 [tool.poetry]

@@ -3,12 +3,10 @@ import os
 import unittest
 from bigdatacorp_api.data import BigDataCorpAPI
 from bigdatacorp_api.exceptions import (
-    BigDataCorpAPIException, BigDataCorpAPIInvalidDocumentException,
-    BigDataCorpAPIMaxRetryException)
+    BigDataCorpAPIInvalidDocumentException)
 
 
 BIGDATA_AUTH_TOKEN = os.environ.get("BIGDATA_AUTH_TOKEN")
-TEST_CPF = os.environ.get("TEST_CPF")
 TEST_CNPJ = os.environ.get("TEST_CNPJ")
 
 
@@ -30,3 +28,15 @@ class TestBigDataCorpCNPJAPI(unittest.TestCase):
         lawsuits_entry = lawsuits['Lawsuits']
         lawsuits_data = lawsuits_entry[0]
         self.assertNotIn("Updates", lawsuits_data.keys())
+
+    def test__invalid(self) -> None:
+        """Raise when the CNPJ document number is invalid."""
+        bigdata_api = BigDataCorpAPI(
+            bigdata_auth_token=BIGDATA_AUTH_TOKEN)
+        with self.assertRaises(
+                BigDataCorpAPIInvalidDocumentException) as context:
+            bigdata_api.get_cnpj_dataset(
+                cnpj=TEST_CNPJ + "0", dataset="basic_data")
+        self.assertEqual(
+            context.exception.message,
+            "cnpj [{cnpj}] não é válido")

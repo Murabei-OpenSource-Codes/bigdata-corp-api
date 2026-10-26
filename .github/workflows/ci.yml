@@ -43,7 +43,11 @@ jobs:
 
           python -m poetry build
           echo "VERSION=${VERSION}"
-          
+
+          # pdoc imports the package on this interpreter. The wheel
+          # install puts runtime dependencies (tenacity, loguru,
+          # requests) on the same path.
+          pip install dist/*.whl
           pdoc --docformat="google" src/bigdatacorp_api -o ./docs
           poetry publish --username __token__ --password "$PYPI_API_TOKEN"
 
